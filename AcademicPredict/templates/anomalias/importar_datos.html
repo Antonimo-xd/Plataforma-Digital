@@ -1,0 +1,585 @@
+{% extends 'anomalias/base.html' %}
+
+{% block title %}Importar Datos{% endblock %}
+
+{% block extra_css %}
+<style>
+.drag-over {
+    border: 2px dashed #007bff !important;
+    background-color: #f8f9fa !important;
+}
+
+.csv-preview {
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    margin-top: 1rem;
+}
+
+.csv-preview table {
+    font-size: 0.8rem;
+}
+
+.csv-preview th.bg-success {
+    background-color: #28a745 !important;
+}
+
+.file-feedback {
+    transition: all 0.3s ease;
+}
+
+#progressContainer {
+    display: none;
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.metric-card {
+    background: linear-gradient(135deg, #6c757d, #5a6268);
+    color: white;
+    border-radius: 10px;
+    transition: transform 0.3s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-3px);
+}
+
+.btn-upload {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    border: none;
+    transition: all 0.3s ease;
+}
+
+.btn-upload:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+}
+
+.file-input-wrapper {
+    position: relative;
+    overflow: hidden;
+    display: inline-block;
+    width: 100%;
+}
+
+.file-input-wrapper input[type=file] {
+    position: absolute;
+    left: -9999px;
+}
+
+.file-input-label {
+    cursor: pointer;
+    display: block;
+    padding: 0.75rem;
+    border: 2px dashed #ced4da;
+    border-radius: 0.375rem;
+    text-align: center;
+    transition: all 0.3s ease;
+    background-color: #ffffff;
+}
+
+.file-input-label:hover {
+    border-color: #007bff;
+    background-color: #f8f9fa;
+}
+
+.file-input-label.has-file {
+    border-color: #28a745;
+    background-color: #d4edda;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-cloud-upload-alt me-2"></i>
+                Importar Datos CSV/Excel
+            </h1>
+            <p class="text-muted">Cargar datos académicos desde archivos externos</p>
+        </div>
+    </div>
+
+    <!-- Estado actual de la base de datos -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <h6><i class="fas fa-database me-2"></i>Estado Actual de la Base de Datos:</h6>
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <div class="metric-card p-3">
+                            <i class="fas fa-graduation-cap fa-2x mb-2"></i>
+                            <h5 class="mb-0">{{ stats.total_carreras|default:0 }}</h5>
+                            <small>Carreras</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card p-3">
+                            <i class="fas fa-users fa-2x mb-2"></i>
+                            <h5 class="mb-0">{{ stats.total_estudiantes|default:0 }}</h5>
+                            <small>Estudiantes</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card p-3">
+                            <i class="fas fa-book fa-2x mb-2"></i>
+                            <h5 class="mb-0">{{ stats.total_asignaturas|default:0 }}</h5>
+                            <small>Asignaturas</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card p-3">
+                            <i class="fas fa-chart-line fa-2x mb-2"></i>
+                            <h5 class="mb-0">{{ stats.total_registros|default:0 }}</h5>
+                            <small>Registros</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Formulario de importación -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-file-upload me-2"></i>
+                        Seleccionar Archivos
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data" id="importForm">
+                        {% csrf_token %}
+                        
+                        <!-- Estudiantes -->
+                        <div class="mb-4">
+                            <label for="{{ form.archivo_estudiantes.id_for_label }}" class="form-label">
+                                <i class="fas fa-users me-2 text-primary"></i>
+                                <strong>1. Archivo de Estudiantes</strong>
+                                <button type="button" class="btn btn-outline-info btn-sm ms-2" 
+                                        onclick="showFormatExample('estudiantes')" title="Ver ejemplo de formato">
+                                    <i class="fas fa-question-circle"></i>
+                                </button>
+                            </label>
+                            {{ form.archivo_estudiantes }}
+                            <div class="form-text">
+                                {{ form.archivo_estudiantes.help_text }}
+                            </div>
+                        </div>
+
+                        <!-- Asignaturas -->
+                        <div class="mb-4">
+                            <label for="{{ form.archivo_asignaturas.id_for_label }}" class="form-label">
+                                <i class="fas fa-book me-2 text-success"></i>
+                                <strong>2. Archivo de Asignaturas</strong>
+                                <button type="button" class="btn btn-outline-info btn-sm ms-2" 
+                                        onclick="showFormatExample('asignaturas')" title="Ver ejemplo de formato">
+                                    <i class="fas fa-question-circle"></i>
+                                </button>
+                            </label>
+                            {{ form.archivo_asignaturas }}
+                            <div class="form-text">
+                                {{ form.archivo_asignaturas.help_text }}
+                            </div>
+                        </div>
+
+                        <!-- Registros Académicos -->
+                        <div class="mb-4">
+                            <label for="{{ form.archivo_registros.id_for_label }}" class="form-label">
+                                <i class="fas fa-chart-line me-2 text-warning"></i>
+                                <strong>3. Archivo de Registros Académicos</strong>
+                                <button type="button" class="btn btn-outline-info btn-sm ms-2" 
+                                        onclick="showFormatExample('registros')" title="Ver ejemplo de formato">
+                                    <i class="fas fa-question-circle"></i>
+                                </button>
+                            </label>
+                            {{ form.archivo_registros }}
+                            <div class="form-text">
+                                {{ form.archivo_registros.help_text }}
+                            </div>
+                        </div>
+
+                        <!-- Barra de progreso -->
+                        <div id="progressContainer" class="mb-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6>
+                                        <i class="fas fa-spinner fa-spin me-2"></i>
+                                        Procesando importación...
+                                    </h6>
+                                    <div class="progress">
+                                        <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                             role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                    <small id="progressText" class="text-muted">Preparando...</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Botón de envío -->
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg btn-upload">
+                                <i class="fas fa-cloud-upload-alt me-2"></i>
+                                Importar Datos
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Panel de información -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Información Important Estudiantes (IdEstudiante, Nombre, Carrera, Ingreso_año)</h6>
+                        <p class="text-muted small mb-2">Los estudiantes deben importarse primero</p>
+                        <div class="alert alert-info py-2">
+                            <small>
+                                <strong>Ejemplo:</strong><br>
+                                IdEstudiante,Nombre,Carrera,Ingreso_año<br>
+                                12345,"Juan Pérez","Ingeniería Civil",2020<br>
+                                12346,"María García","Medicina",2019
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6 class="text-success">
+                            <i class="fas fa-book me-2"></i>
+                            Asignaturas (Id_Asignatura, NombreAsignatura, Semestre)
+                        </h6>
+                        <div class="alert alert-success py-2">
+                            <small>
+                                <strong>Ejemplo:</strong><br>
+                                Id_Asignatura,NombreAsignatura,Semestre<br>
+                                101,"Cálculo I",1<br>
+                                102,"Física General",2
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6 class="text-warning">
+                            <i class="fas fa-chart-line me-2"></i>
+                            Registros Académicos
+                        </h6>
+                        <p class="text-muted small mb-2">Columnas: Id_Estudiante, Id_asignatura, Nota1-4, % Asistencia, % Uso plataforma</p>
+                        <div class="alert alert-warning py-2">
+                            <small>
+                                <strong>Importante:</strong> Los estudiantes y asignaturas deben existir previamente
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-light">
+                        <h6 class="text-dark">
+                            <i class="fas fa-lightbulb me-2"></i>
+                            Consejos
+                        </h6>
+                        <ul class="small mb-0">
+                            <li>Verifica que los nombres de columnas sean exactos</li>
+                            <li>Soporta archivos CSV y Excel</li>
+                            <li>Máximo 10MB por archivo</li>
+                            <li>Importa en orden: Estudiantes → Asignaturas → Registros</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel de archivos de ejemplo -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-download me-2"></i>
+                        Archivos de Ejemplo
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted mb-3">Descarga plantillas CSV para facilitar la importación:</p>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-primary btn-sm" onclick="downloadTemplate('estudiantes')">
+                            <i class="fas fa-users me-1"></i>
+                            Plantilla Estudiantes
+                        </button>
+                        <button class="btn btn-outline-success btn-sm" onclick="downloadTemplate('asignaturas')">
+                            <i class="fas fa-book me-1"></i>
+                            Plantilla Asignaturas
+                        </button>
+                        <button class="btn btn-outline-warning btn-sm" onclick="downloadTemplate('registros')">
+                            <i class="fas fa-chart-line me-1"></i>
+                            Plantilla Registros
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de ayuda de formato -->
+<div class="modal fade" id="formatModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-file-csv me-2"></i>
+                    Formato de Archivo
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="formatModalBody">
+                <!-- Contenido dinámico -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/**
+ * 📁 Sistema de importación mejorado
+ */
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Inicializando sistema de importación...');
+    
+    initFileValidation();
+    initFormSubmission();
+});
+
+/**
+ * 📋 Validación de archivos
+ */
+function initFileValidation() {
+    const fileInputs = document.querySelectorAll('input[type="file"]');
+    
+    fileInputs.forEach(input => {
+        input.addEventListener('change', function(e) {
+            validateFile(e.target);
+        });
+    });
+}
+
+/**
+ * 🔍 Validar archivo
+ */
+function validateFile(input) {
+    const file = input.files[0];
+    const wrapper = input.closest('.mb-4');
+    
+    // Limpiar feedback anterior
+    const oldFeedback = wrapper.querySelector('.file-feedback');
+    if (oldFeedback) {
+        oldFeedback.remove();
+    }
+    
+    if (!file) return;
+    
+    // Crear elemento de feedback
+    const feedback = document.createElement('div');
+    feedback.className = 'file-feedback mt-2';
+    wrapper.appendChild(feedback);
+    
+    // Validar extensión
+    const validExtensions = ['.csv', '.xlsx', '.xls'];
+    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+    
+    if (!validExtensions.includes(fileExtension)) {
+        feedback.className += ' alert alert-danger py-2';
+        feedback.innerHTML = `<small><i class="fas fa-times me-1"></i>Formato no válido. Use: ${validExtensions.join(', ')}</small>`;
+        input.value = '';
+        return;
+    }
+    
+    // Validar tamaño
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+        feedback.className += ' alert alert-danger py-2';
+        feedback.innerHTML = `<small><i class="fas fa-times me-1"></i>Archivo muy grande (${formatFileSize(file.size)}). Máximo: 10MB</small>`;
+        input.value = '';
+        return;
+    }
+    
+    // Feedback positivo
+    feedback.className += ' alert alert-success py-2';
+    feedback.innerHTML = `<small><i class="fas fa-check me-1"></i>${file.name} (${formatFileSize(file.size)}) - Listo para importar</small>`;
+}
+
+/**
+ * 📤 Envío del formulario
+ */
+function initFormSubmission() {
+    const form = document.getElementById('importForm');
+    const submitBtn = form.querySelector('button[type="submit"]');
+    
+    form.addEventListener('submit', function(e) {
+        const fileInputs = form.querySelectorAll('input[type="file"]');
+        const hasFiles = Array.from(fileInputs).some(input => input.files.length > 0);
+        
+        if (!hasFiles) {
+            e.preventDefault();
+            alert('⚠️ Selecciona al menos un archivo para importar');
+            return;
+        }
+        
+        // Mostrar progreso
+        showProgress();
+        
+        // Deshabilitar botón
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Procesando...';
+    });
+}
+
+/**
+ * 📊 Mostrar progreso
+ */
+function showProgress() {
+    const progressContainer = document.getElementById('progressContainer');
+    if (progressContainer) {
+        progressContainer.style.display = 'block';
+        
+        // Simular progreso
+        const steps = [
+            { progress: 10, text: 'Validando archivos...' },
+            { progress: 30, text: 'Procesando estudiantes...' },
+            { progress: 50, text: 'Procesando asignaturas...' },
+            { progress: 70, text: 'Procesando registros...' },
+            { progress: 90, text: 'Finalizando...' }
+        ];
+        
+        let currentStep = 0;
+        const interval = setInterval(() => {
+            if (currentStep < steps.length) {
+                const step = steps[currentStep];
+                updateProgress(step.progress, step.text);
+                currentStep++;
+            } else {
+                clearInterval(interval);
+            }
+        }, 800);
+    }
+}
+
+/**
+ * 📈 Actualizar progreso
+ */
+function updateProgress(percent, text) {
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    
+    if (progressBar) {
+        progressBar.style.width = percent + '%';
+        progressBar.setAttribute('aria-valuenow', percent);
+    }
+    if (progressText) {
+        progressText.textContent = text;
+    }
+}
+
+/**
+ * 💡 Mostrar ejemplo de formato
+ */
+function showFormatExample(type) {
+    const modal = document.getElementById('formatModal');
+    const modalBody = document.getElementById('formatModalBody');
+    
+    const formats = {
+        estudiantes: {
+            title: 'Estudiantes',
+            headers: ['IdEstudiante', 'Nombre', 'Carrera', 'Ingreso_año'],
+            example: '12345,"Juan Pérez","Ingeniería Civil",2020\n12346,"María García","Medicina",2019',
+            notes: 'Los estudiantes deben importarse antes que los registros académicos.'
+        },
+        asignaturas: {
+            title: 'Asignaturas', 
+            headers: ['Id_Asignatura', 'NombreAsignatura', 'Semestre'],
+            example: '101,"Cálculo I",1\n102,"Física General",2',
+            notes: 'El semestre debe ser un número entre 1 y 12.'
+        },
+        registros: {
+            title: 'Registros Académicos',
+            headers: ['Id_Estudiante', 'Id_asignatura', 'Nota1', 'Nota2', 'Nota3', 'Nota4', '% de Asistencia', '% de Uso de plataforma'],
+            example: '12345,101,6.5,5.8,6.2,6.0,85.5,75.2\n12346,102,5.5,6.0,5.8,6.2,90.0,80.5',
+            notes: 'Los IDs de estudiante y asignatura deben existir previamente. Las notas van de 1.0 a 7.0, los porcentajes de 0 a 100.'
+        }
+    };
+    
+    const format = formats[type];
+    
+    modalBody.innerHTML = `
+        <h6 class="text-primary">Formato para ${format.title}</h6>
+        
+        <div class="alert alert-info">
+            <strong>Columnas requeridas:</strong>
+            <ul class="mb-0 mt-2">
+                ${format.headers.map(h => `<li><code>${h}</code></li>`).join('')}
+            </ul>
+        </div>
+        
+        <h6>Ejemplo de contenido CSV:</h6>
+        <pre class="bg-light p-3 rounded"><code>${format.headers.join(',')}\n${format.example}</code></pre>
+        
+        <div class="alert alert-warning">
+            <strong>Nota importante:</strong> ${format.notes}
+        </div>
+    `;
+    
+    new bootstrap.Modal(modal).show();
+}
+
+/**
+ * 📥 Descargar plantillas
+ */
+function downloadTemplate(type) {
+    const templates = {
+        estudiantes: {
+            filename: 'plantilla_estudiantes.csv',
+            content: 'IdEstudiante,Nombre,Carrera,Ingreso_año\n12345,"Juan Pérez","Ingeniería Civil",2020\n12346,"María García","Medicina",2019'
+        },
+        asignaturas: {
+            filename: 'plantilla_asignaturas.csv', 
+            content: 'Id_Asignatura,NombreAsignatura,Semestre\n101,"Cálculo I",1\n102,"Física General",2'
+        },
+        registros: {
+            filename: 'plantilla_registros.csv',
+            content: 'Id_Estudiante,Id_asignatura,Nota1,Nota2,Nota3,Nota4,% de Asistencia,% de Uso de plataforma\n12345,101,6.5,5.8,6.2,6.0,85.5,75.2\n12346,102,5.5,6.0,5.8,6.2,90.0,80.5'
+        }
+    };
+    
+    const template = templates[type];
+    const blob = new Blob([template.content], { type: 'text/csv;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = template.filename;
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+
+/**
+ * 🔧 Utilidades
+ */
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+</script>
+{% endblock %}

@@ -1,0 +1,732 @@
+{% extends 'anomalias/base.html' %}
+{% load url_helpers %}
+
+{% block title %}Anomalías Detectadas{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Anomalías Detectadas
+            </h1>
+            <p class="text-muted">Estudiantes con comportamiento académico anómalo</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#filtrosModal">
+                <i class="fas fa-filter me-2"></i>Filtros
+            </button>
+            <button type="button" class="btn btn-success" onclick="exportarTodos()">
+                <i class="fas fa-download me-2"></i>Exportar Todo
+            </button>
+        </div>
+    </div>
+
+    <!-- Estadísticas CORREGIDAS -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-warning">
+                <div class="card-body text-center">
+                    <i class="fas fa-list fa-2x text-warning mb-2"></i>
+                    <h3 class="mb-0">{{ page_obj.paginator.count|default:"0" }}</h3>
+                    <p class="mb-0">Total Anomalías</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-info">
+                <div class="card-body text-center">
+                    <i class="fas fa-eye fa-2x text-info mb-2"></i>
+                    <h3 class="mb-0">{{ page_obj.number|default:"1" }}</h3>
+                    <p class="mb-0">Página Actual</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <i class="fas fa-copy fa-2x text-success mb-2"></i>
+                    <h3 class="mb-0">{{ page_obj.paginator.num_pages|default:"1" }}</h3>
+                    <p class="mb-0">Total Páginas</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-danger">
+                <div class="card-body text-center">
+                    <i class="fas fa-fire fa-2x text-danger mb-2"></i>
+                    <h3 class="mb-0">{{ page_obj.object_list|length|default:"0" }}</h3>
+                    <p class="mb-0">En Esta Página</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barra de herramientas de selección -->
+    <div id="barraHerramientasSeleccion" class="alert alert-info py-2" style="display: none;">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <span id="contadorSeleccionadas">0</span> anomalías seleccionadas
+            </div>
+            <div class="col-md-6 text-end">
+                <button type="button" class="btn btn-sm btn-outline-secondary me-2" onclick="deseleccionarTodas()">
+                    <i class="fas fa-times me-1"></i>Deseleccionar
+                </button>
+                <button type="button" class="btn btn-sm btn-warning me-2" onclick="cambiarEstadoMasivo()">
+                    <i class="fas fa-edit me-1"></i>Cambiar Estado
+                </button>
+                <button type="button" class="btn btn-sm btn-success" onclick="exportarSeleccionadas()">
+                    <i class="fas fa-download me-1"></i>Exportar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de anomalías -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <h5 class="mb-0">
+                                <i class="fas fa-table me-2"></i>
+                                Listado de Anomalías
+                                {% if filtros_actuales.estado or filtros_actuales.tipo or filtros_actuales.buscar %}
+                                <small class="text-muted">(Filtrada)</small>
+                                {% endif %}
+                            </h5>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-primary" onclick="seleccionarTodas()">
+                                    <i class="fas fa-check-square me-1"></i>Seleccionar Todas
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="deseleccionarTodas()">
+                                    <i class="fas fa-square me-1"></i>Deseleccionar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    {% if page_obj.object_list %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th width="40">
+                                        <input type="checkbox" id="selectAllCheckbox" class="form-check-input">
+                                    </th>
+                                    <th>Estudiante</th>
+                                    <th>Carrera</th>
+                                    <th>Tipo Anomalía</th>
+                                    <th>Estado</th>
+                                    <th>Prioridad</th>
+                                    <th>Score</th>
+                                    <th>Fecha</th>
+                                    <th width="120">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for anomalia in page_obj.object_list %}
+                                <tr class="anomalia-row">
+                                    <td>
+                                        <input type="checkbox" class="form-check-input anomalia-checkbox" 
+                                               value="{{ anomalia.id }}" data-estudiante="{{ anomalia.estudiante.nombre }}">
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-circle avatar-sm rounded-circle d-flex align-items-center justify-content-center me-2 {{ anomalia.estudiante.nombre|avatar_color }}">
+                                                <small class="text-white fw-bold">{{ anomalia.estudiante.nombre|initials }}</small>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold">{{ anomalia.estudiante.nombre }}</div>
+                                                <small class="text-muted">ID: {{ anomalia.estudiante.id_estudiante }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">
+                                            {{ anomalia.estudiante.carrera.nombre|default:"Sin carrera" }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{% if anomalia.tipo_anomalia == 'bajo_rendimiento' %}danger{% elif anomalia.tipo_anomalia == 'baja_asistencia' %}warning{% elif anomalia.tipo_anomalia == 'bajo_uso_plataforma' %}info{% else %}dark{% endif %}">
+                                            {{ anomalia.get_tipo_anomalia_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{% if anomalia.estado == 'detectado' %}warning{% elif anomalia.estado == 'en_revision' %}info{% elif anomalia.estado == 'intervencion_activa' %}primary{% elif anomalia.estado == 'resuelto' %}success{% else %}secondary{% endif %}">
+                                            {{ anomalia.get_estado_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-priority-{{ anomalia.prioridad }}">
+                                            {{ anomalia.prioridad }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="text-center">
+                                            <strong>{{ anomalia.score_anomalia|floatformat:1 }}</strong>
+                                            <div class="progress" style="height: 4px;">
+                                                <div class="progress-bar bg-{% if anomalia.score_anomalia >= 80 %}danger{% elif anomalia.score_anomalia >= 60 %}warning{% else %}success{% endif %}" 
+                                                     style="width: {{ anomalia.score_anomalia }}%"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <small>{{ anomalia.fecha_deteccion|date:"d/m/Y" }}</small>
+                                        <br>
+                                        <small class="text-muted">{{ anomalia.fecha_deteccion|time:"H:i" }}</small>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'detalle_anomalia' anomalia.pk %}" 
+                                               class="btn btn-outline-primary btn-sm" 
+                                               title="Ver detalle">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            {% if user.rol == 'analista_cpa' %}
+                                            <a href="{% url 'crear_derivacion' anomalia.id %}" 
+                                               class="btn btn-outline-success btn-sm" 
+                                               title="Crear derivación">
+                                                <i class="fas fa-share"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No se encontraron anomalías</h5>
+                        <p class="text-muted">
+                            {% if filtros_actuales.estado or filtros_actuales.tipo or filtros_actuales.buscar %}
+                            No hay anomalías que coincidan con los filtros aplicados.
+                            <br>
+                            <a href="{% url 'listado_anomalias' %}" class="btn btn-outline-primary btn-sm mt-2">
+                                <i class="fas fa-times me-1"></i>Limpiar Filtros
+                            </a>
+                            {% else %}
+                            Aún no se han detectado anomalías en el sistema.
+                            {% endif %}
+                        </p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paginación CORREGIDA -->
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <nav aria-label="Paginación de anomalías">
+                <ul class="pagination justify-content-center">
+                    <!-- Página anterior -->
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?{% url_params request 'page' page_obj.previous_page_number %}">
+                            <i class="fas fa-chevron-left"></i> Anterior
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link"><i class="fas fa-chevron-left"></i> Anterior</span>
+                    </li>
+                    {% endif %}
+
+                    <!-- Números de página -->
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?{% url_params request 'page' num %}">{{ num }}</a>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    <!-- Página siguiente -->
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?{% url_params request 'page' page_obj.next_page_number %}">
+                            Siguiente <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">Siguiente <i class="fas fa-chevron-right"></i></span>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            
+            <!-- Info de paginación -->
+            <div class="text-center text-muted">
+                <small>
+                    Mostrando {{ page_obj.start_index }} - {{ page_obj.end_index }} 
+                    de {{ page_obj.paginator.count }} anomalías
+                </small>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal de Filtros CORREGIDO -->
+<div class="modal fade" id="filtrosModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-filter me-2"></i>Filtros de Búsqueda
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="get" action="{% url 'listado_anomalias' %}">
+                <div class="modal-body">
+                    <div class="row">
+                        <!-- Estado -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Estado</label>
+                            <select name="estado" class="form-select">
+                                <option value="">Todos los estados</option>
+                                {% for estado_key, estado_name in estados_choices %}
+                                <option value="{{ estado_key }}" {% if filtros_actuales.estado == estado_key %}selected{% endif %}>
+                                    {{ estado_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Tipo -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Tipo de Anomalía</label>
+                            <select name="tipo" class="form-select">
+                                <option value="">Todos los tipos</option>
+                                {% for tipo_key, tipo_name in tipos_choices %}
+                                <option value="{{ tipo_key }}" {% if filtros_actuales.tipo == tipo_key %}selected{% endif %}>
+                                    {{ tipo_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Prioridad -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Prioridad</label>
+                            <select name="prioridad" class="form-select">
+                                <option value="">Todas las prioridades</option>
+                                <option value="1" {% if filtros_actuales.prioridad == "1" %}selected{% endif %}>1 - Muy Baja</option>
+                                <option value="2" {% if filtros_actuales.prioridad == "2" %}selected{% endif %}>2 - Baja</option>
+                                <option value="3" {% if filtros_actuales.prioridad == "3" %}selected{% endif %}>3 - Media</option>
+                                <option value="4" {% if filtros_actuales.prioridad == "4" %}selected{% endif %}>4 - Alta</option>
+                                <option value="5" {% if filtros_actuales.prioridad == "5" %}selected{% endif %}>5 - Crítica</option>
+                            </select>
+                        </div>
+
+                        <!-- Carrera (solo para coordinadores CPA) -->
+                        {% if carreras_disponibles %}
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Carrera</label>
+                            <select name="carrera" class="form-select">
+                                <option value="">Todas las carreras</option>
+                                {% for carrera in carreras_disponibles %}
+                                <option value="{{ carrera.id }}" {% if filtros_actuales.carrera == carrera.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ carrera.nombre }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
+
+                        <!-- Búsqueda por nombre -->
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">Buscar Estudiante</label>
+                            <input type="text" name="buscar" class="form-control" 
+                                   placeholder="Nombre o ID del estudiante..." 
+                                   value="{{ filtros_actuales.buscar }}">
+                        </div>
+
+                        <!-- Rango de fechas -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Fecha Desde</label>
+                            <input type="date" name="fecha_desde" class="form-control" 
+                                   value="{{ filtros_actuales.fecha_desde }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Fecha Hasta</label>
+                            <input type="date" name="fecha_hasta" class="form-control" 
+                                   value="{{ filtros_actuales.fecha_hasta }}">
+                        </div>
+
+                        <!-- Ordenamiento -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Ordenar por</label>
+                            <select name="orden" class="form-select">
+                                <option value="-fecha_deteccion" {% if filtros_actuales.orden == "-fecha_deteccion" %}selected{% endif %}>Fecha (más reciente)</option>
+                                <option value="fecha_deteccion" {% if filtros_actuales.orden == "fecha_deteccion" %}selected{% endif %}>Fecha (más antigua)</option>
+                                <option value="-score_anomalia" {% if filtros_actuales.orden == "-score_anomalia" %}selected{% endif %}>Score (mayor a menor)</option>
+                                <option value="score_anomalia" {% if filtros_actuales.orden == "score_anomalia" %}selected{% endif %}>Score (menor a mayor)</option>
+                                <option value="estudiante__nombre" {% if filtros_actuales.orden == "estudiante__nombre" %}selected{% endif %}>Nombre (A-Z)</option>
+                                <option value="-estudiante__nombre" {% if filtros_actuales.orden == "-estudiante__nombre" %}selected{% endif %}>Nombre (Z-A)</option>
+                                <option value="-prioridad" {% if filtros_actuales.orden == "-prioridad" %}selected{% endif %}>Prioridad (alta a baja)</option>
+                            </select>
+                        </div>
+
+                        <!-- Elementos por página -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Elementos por página</label>
+                            <select name="per_page" class="form-select">
+                                <option value="10" {% if filtros_actuales.per_page == "10" %}selected{% endif %}>10</option>
+                                <option value="20" {% if filtros_actuales.per_page == "20" %}selected{% endif %}>20</option>
+                                <option value="50" {% if filtros_actuales.per_page == "50" %}selected{% endif %}>50</option>
+                                <option value="100" {% if filtros_actuales.per_page == "100" %}selected{% endif %}>100</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <a href="{% url 'listado_anomalias' %}" class="btn btn-secondary">
+                        <i class="fas fa-times me-1"></i>Limpiar Filtros
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search me-1"></i>Aplicar Filtros
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para cambio de estado masivo -->
+<div class="modal fade" id="cambiarEstadoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Cambiar Estado Masivo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formCambiarEstado" method="post" action="{% url 'gestion_masiva_anomalias' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="cambiar_estado">
+                <div class="modal-body">
+                    <p>¿Estás seguro de cambiar el estado de las <span id="cantidadSeleccionadas">0</span> anomalías seleccionadas?</p>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Nuevo Estado</label>
+                        <select name="nuevo_estado" class="form-select" required>
+                            <option value="">Seleccionar estado...</option>
+                            {% for estado_key, estado_name in estados_choices %}
+                            <option value="{{ estado_key }}">{{ estado_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning">Cambiar Estado</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+
+<script>
+// Variables globales
+let anomaliasSeleccionadas = [];
+
+// Inicialización
+document.addEventListener('DOMContentLoaded', function() {
+    actualizarContadorSeleccionadas();
+    
+    // Event listeners para checkboxes individuales
+    document.querySelectorAll('.anomalia-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const anomaliaId = parseInt(this.value);
+            
+            if (this.checked) {
+                if (!anomaliasSeleccionadas.includes(anomaliaId)) {
+                    anomaliasSeleccionadas.push(anomaliaId);
+                }
+            } else {
+                const index = anomaliasSeleccionadas.indexOf(anomaliaId);
+                if (index > -1) {
+                    anomaliasSeleccionadas.splice(index, 1);
+                }
+            }
+            
+            actualizarContadorSeleccionadas();
+            actualizarSelectAllCheckbox();
+        });
+    });
+    
+    // Event listener para select all
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                seleccionarTodas();
+            } else {
+                deseleccionarTodas();
+            }
+        });
+    }
+});
+
+// Función para seleccionar todas las anomalías de la página
+function seleccionarTodas() {
+    document.querySelectorAll('.anomalia-checkbox').forEach(checkbox => {
+        checkbox.checked = true;
+        const anomaliaId = parseInt(checkbox.value);
+        if (!anomaliasSeleccionadas.includes(anomaliaId)) {
+            anomaliasSeleccionadas.push(anomaliaId);
+        }
+    });
+    actualizarContadorSeleccionadas();
+    actualizarSelectAllCheckbox();
+}
+
+// Función para deseleccionar todas las anomalías
+function deseleccionarTodas() {
+    document.querySelectorAll('.anomalia-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+        const anomaliaId = parseInt(checkbox.value);
+        const index = anomaliasSeleccionadas.indexOf(anomaliaId);
+        if (index > -1) {
+            anomaliasSeleccionadas.splice(index, 1);
+        }
+    });
+    actualizarContadorSeleccionadas();
+    actualizarSelectAllCheckbox();
+}
+
+// Actualizar contador y mostrar/ocultar barra de herramientas
+function actualizarContadorSeleccionadas() {
+    const contador = anomaliasSeleccionadas.length;
+    const contadorElement = document.getElementById('contadorSeleccionadas');
+    if (contadorElement) {
+        contadorElement.textContent = contador;
+    }
+    
+    const barra = document.getElementById('barraHerramientasSeleccion');
+    if (barra) {
+        if (contador > 0) {
+            barra.style.display = 'block';
+        } else {
+            barra.style.display = 'none';
+        }
+    }
+}
+
+// Actualizar estado del checkbox de select all
+function actualizarSelectAllCheckbox() {
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    if (!selectAllCheckbox) return;
+    
+    const checkboxes = document.querySelectorAll('.anomalia-checkbox');
+    const checkedCheckboxes = document.querySelectorAll('.anomalia-checkbox:checked');
+    
+    if (checkedCheckboxes.length === 0) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+    } else if (checkedCheckboxes.length === checkboxes.length) {
+        selectAllCheckbox.checked = true;
+        selectAllCheckbox.indeterminate = false;
+    } else {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = true;
+    }
+}
+
+// Cambiar estado masivo
+function cambiarEstadoMasivo() {
+    if (anomaliasSeleccionadas.length === 0) {
+        alert('No hay anomalías seleccionadas');
+        return;
+    }
+    
+    const cantidadElement = document.getElementById('cantidadSeleccionadas');
+    if (cantidadElement) {
+        cantidadElement.textContent = anomaliasSeleccionadas.length;
+    }
+    
+    // Agregar IDs al formulario
+    const form = document.getElementById('formCambiarEstado');
+    if (!form) return;
+    
+    // Limpiar inputs anteriores
+    form.querySelectorAll('input[name="anomalias_seleccionadas"]').forEach(input => {
+        input.remove();
+    });
+    
+    // Agregar nuevos inputs
+    anomaliasSeleccionadas.forEach(id => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'anomalias_seleccionadas';
+        input.value = id;
+        form.appendChild(input);
+    });
+    
+    // Mostrar modal
+    const modal = new bootstrap.Modal(document.getElementById('cambiarEstadoModal'));
+    modal.show();
+}
+
+// Exportar anomalías seleccionadas
+function exportarSeleccionadas() {
+    if (anomaliasSeleccionadas.length === 0) {
+        alert('No hay anomalías seleccionadas para exportar');
+        return;
+    }
+    
+    console.log('📊 Exportando anomalías seleccionadas:', anomaliasSeleccionadas);
+    
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '{% url "gestion_masiva_anomalias" %}';
+    
+    // CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (csrfToken) {
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = csrfToken.value;
+        form.appendChild(csrfInput);
+    }
+    
+    // Action
+    const actionInput = document.createElement('input');
+    actionInput.type = 'hidden';
+    actionInput.name = 'action';
+    actionInput.value = 'exportar';
+    form.appendChild(actionInput);
+    
+    // IDs seleccionados
+    anomaliasSeleccionadas.forEach(id => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'anomalias_seleccionadas';
+        input.value = id;
+        form.appendChild(input);
+    });
+    
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+}
+
+// CORREGIDO: Exportar todas las anomalías (respetando filtros)
+function exportarTodos() {
+    if (confirm('¿Deseas exportar TODAS las anomalías (respetando los filtros aplicados)?')) {
+        console.log('📊 Exportando todas las anomalías...');
+        
+        // Obtener la URL actual con todos sus parámetros (filtros)
+        const urlActual = new URL(window.location.href);
+        const parametros = urlActual.searchParams;
+        
+        // Crear la URL de exportación manteniendo los filtros
+        const urlExportacion = new URL('{% url "exportar_todas_anomalias" %}', window.location.origin);
+        
+        // Copiar todos los parámetros de filtros (excepto 'page')
+        for (const [key, value] of parametros) {
+            if (key !== 'page') {  // Excluir paginación
+                urlExportacion.searchParams.append(key, value);
+            }
+        }
+        
+        console.log('🔗 URL de exportación:', urlExportacion.toString());
+        
+        // Redirigir a la URL de exportación
+        window.location.href = urlExportacion.toString();
+    }
+}
+
+// Función auxiliar para obtener el CSRF token
+function getCsrfToken() {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    return csrfToken ? csrfToken.value : '';
+}
+</script>
+
+<!-- Estilos adicionales -->
+<style>
+.anomalia-row {
+    transition: background-color 0.2s ease;
+}
+
+.anomalia-row:hover {
+    background-color: rgba(52, 152, 219, 0.05);
+}
+
+.avatar-circle {
+    transition: all 0.2s ease;
+}
+
+.anomalia-row:hover .avatar-circle {
+    transform: scale(1.05);
+}
+
+/* Badges de prioridad */
+.badge-priority-1 { background-color: #6c757d; color: white; }
+.badge-priority-2 { background-color: #28a745; color: white; }
+.badge-priority-3 { background-color: #ffc107; color: #000; }
+.badge-priority-4 { background-color: #fd7e14; color: white; }
+.badge-priority-5 { background-color: #dc3545; color: white; }
+
+.avatar-sm {
+    width: 32px;
+    height: 32px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.table th {
+    border-top: none;
+    border-bottom: 2px solid #dee2e6;
+    font-weight: 600;
+    background-color: #f8f9fa;
+}
+
+#barraHerramientasSeleccion {
+    border-left: 4px solid #0d6efd;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .btn-group-sm .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+    
+    /* Ocultar columnas menos importantes en móvil */
+    .table th:nth-child(3),
+    .table td:nth-child(3),
+    .table th:nth-child(7),
+    .table td:nth-child(7) {
+        display: none;
+    }
+}
+</style>
+{% endblock %}

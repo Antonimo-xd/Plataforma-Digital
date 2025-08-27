@@ -1,0 +1,395 @@
+{% extends 'anomalias/base.html' %}
+
+{% block title %}Configuración de Criterios{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-cogs me-2"></i>
+                Configuración de Criterios
+            </h1>
+            <p class="text-muted">Gestión de criterios de detección de anomalías</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'crear_criterio' %}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Crear Nuevo Criterio
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list me-2"></i>
+                        Criterios Existentes
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if criterios %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Nombre</th>
+                                        <th>Carrera</th>
+                                        <th>Semestre</th>
+                                        <th>Contaminación</th>
+                                        <th>Estado</th>
+                                        <th>Fecha Creación</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for criterio in criterios %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ criterio.nombre }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ criterio.descripcion|truncatechars:50 }}</small>
+                                        </td>
+                                        <td>
+                                            {% if criterio.carrera %}
+                                                {{ criterio.carrera.nombre }}
+                                            {% else %}
+                                                <span class="text-muted">Todas</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if criterio.semestre %}
+                                                Semestre {{ criterio.semestre }}
+                                            {% else %}
+                                                <span class="text-muted">Todos</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ criterio.contamination_rate|floatformat:2 }}</td>
+                                        <td>
+                                            {% if criterio.activo %}
+                                                <span class="badge bg-success">Activo</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Inactivo</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ criterio.fecha_creacion|date:"d/m/Y H:i" }}</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <!-- Ver detalles -->
+                                                <a href="{% url 'detalle_criterio' criterio.id %}" 
+                                                class="btn btn-outline-primary" 
+                                                title="Ver detalles">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                
+                                                <!-- Editar criterio -->
+                                                <a href="{% url 'editar_criterio' criterio.id %}" 
+                                                class="btn btn-outline-warning" 
+                                                title="Editar criterio">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                
+                                                <!-- Ejecutar análisis -->
+                                                <button class="btn btn-outline-success" 
+                                                        onclick="ejecutarAnalisis({{ criterio.id }})" 
+                                                        title="Ejecutar análisis">
+                                                    <i class="fas fa-play"></i>
+                                                </button>
+                                                
+                                                <!-- Eliminar criterio -->
+                                                <button class="btn btn-outline-danger" 
+                                                        onclick="confirmarEliminarCriterio({{ criterio.id }}, '{{ criterio.nombre|escapejs }}')" 
+                                                        title="Eliminar criterio">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-cogs fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No hay criterios configurados</h5>
+                            <p class="text-muted">Crea tu primer criterio de detección de anomalías para comenzar.</p>
+                            <a href="{% url 'crear_criterio' %}" class="btn btn-primary">
+                                <i class="fas fa-plus me-2"></i>Crear Primer Criterio
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if criterios %}
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Información sobre Criterios
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <small>
+                        <ul class="mb-0">
+                            <li><strong>Tasa de Contaminación:</strong> Porcentaje esperado de anomalías (0.1 = 10%)</li>
+                            <li><strong>Estimadores:</strong> Número de árboles en el Isolation Forest</li>
+                            <li><strong>Umbrales:</strong> Valores mínimos esperados para clasificar como normal</li>
+                        </ul>
+                    </small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-chart-line me-2"></i>
+                        Estadísticas
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <small>
+                        <p><strong>Total criterios:</strong> {{ criterios|length }}</p>
+                        <p><strong>Criterios activos:</strong> {{ criterios|length }}</p>
+                        <p class="mb-0"><strong>Último análisis:</strong> <em>Pendiente</em></p>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal de confirmación para eliminar criterio -->
+<div class="modal fade" id="modalEliminarCriterio" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Confirmar Eliminación
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-warning me-2"></i>
+                    <strong>¡Atención!</strong> Esta acción no se puede deshacer.
+                </div>
+                
+                <p>¿Estás seguro de que deseas eliminar el criterio:</p>
+                <p class="fw-bold text-center" id="nombreCriterioEliminar"></p>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Nota:</strong> Si este criterio tiene anomalías asociadas, será desactivado en lugar de eliminado para preservar el historial.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <form id="formEliminarCriterio" method="post" style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="confirmar" value="true">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash me-2"></i>Eliminar Criterio
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de progreso de análisis -->
+<div class="modal fade" id="modalProgresoAnalisis" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-cogs me-2"></i>Ejecutando Análisis
+                </h5>
+            </div>
+            <div class="modal-body text-center">
+                <div class="mb-3">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Analizando...</span>
+                    </div>
+                </div>
+                <p id="mensajeProgreso">Iniciando análisis de anomalías...</p>
+                <div class="progress mb-3">
+                    <div class="progress-bar" role="progressbar" style="width: 0%" id="barraProgreso"></div>
+                </div>
+                <small class="text-muted" id="detalleProgreso">Preparando datos...</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmarEliminarCriterio(criterioId, nombreCriterio) {
+    // Llenar modal con información
+    document.getElementById('nombreCriterioEliminar').textContent = nombreCriterio;
+    
+    // Configurar formulario
+    const form = document.getElementById('formEliminarCriterio');
+    form.action = `/cpa/criterios/${criterioId}/eliminar/`;
+    
+    // Mostrar modal
+    const modal = new bootstrap.Modal(document.getElementById('modalEliminarCriterio'));
+    modal.show();
+}
+
+function ejecutarAnalisis(criterioId) {
+    console.log(`🚀 Ejecutando análisis para criterio ${criterioId}`);
+    
+    // Mostrar modal de progreso
+    const modal = new bootstrap.Modal(document.getElementById('modalProgresoAnalisis'));
+    modal.show();
+    
+    // Iniciar análisis
+    fetch(`/cpa/criterios/${criterioId}/ejecutar/`, {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            actualizarProgreso(data.ejecucion_id);
+        } else {
+            mostrarErrorAnalisis(data.error || 'Error desconocido');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        mostrarErrorAnalisis('Error de conexión');
+    });
+}
+
+function actualizarProgreso(ejecucionId) {
+    const interval = setInterval(() => {
+        fetch(`/cpa/api/progreso-analisis/${ejecucionId}/`)
+            .then(response => response.json())
+            .then(data => {
+                // Actualizar interfaz
+                document.getElementById('mensajeProgreso').textContent = data.mensaje || 'Analizando datos...';
+                document.getElementById('detalleProgreso').textContent = data.detalle || '';
+                
+                const progreso = data.progreso || 0;
+                document.getElementById('barraProgreso').style.width = `${progreso}%`;
+                
+                if (data.completado) {
+                    clearInterval(interval);
+                    finalizarAnalisis(data);
+                }
+            })
+            .catch(error => {
+                console.error('Error actualizando progreso:', error);
+                clearInterval(interval);
+                mostrarErrorAnalisis('Error monitoreando progreso');
+            });
+    }, 2000); // Actualizar cada 2 segundos
+}
+
+function finalizarAnalisis(data) {
+    // Cerrar modal de progreso
+    bootstrap.Modal.getInstance(document.getElementById('modalProgresoAnalisis')).hide();
+    
+    // Mostrar resultados
+    if (data.exitoso) {
+        mostrarNotificacion(
+            `✅ Análisis completado: ${data.anomalias_detectadas} anomalías detectadas en ${data.tiempo_ejecucion || 'N/A'}s`,
+            'success'
+        );
+        
+        // Recargar página después de un momento
+        setTimeout(() => {
+            window.location.reload();
+        }, 2000);
+    } else {
+        mostrarErrorAnalisis(data.error || 'El análisis no se completó correctamente');
+    }
+}
+
+function mostrarErrorAnalisis(error) {
+    // Cerrar modal de progreso
+    const modalProgreso = bootstrap.Modal.getInstance(document.getElementById('modalProgresoAnalisis'));
+    if (modalProgreso) {
+        modalProgreso.hide();
+    }
+    
+    // Mostrar error
+    mostrarNotificacion(`❌ Error en análisis: ${error}`, 'danger');
+}
+
+function mostrarNotificacion(mensaje, tipo = 'info') {
+    const notif = document.createElement('div');
+    notif.className = `alert alert-${tipo} alert-dismissible fade show position-fixed`;
+    notif.style.cssText = 'top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
+    
+    notif.innerHTML = `
+        ${mensaje}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(notif);
+    
+    setTimeout(() => {
+        if (notif.parentNode) {
+            notif.parentNode.removeChild(notif);
+        }
+    }, 5000);
+}
+</script>
+
+<style>
+.btn-group-sm .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+.modal-content {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.progress {
+    height: 8px;
+}
+
+.alert {
+    border: none;
+    border-radius: 8px;
+}
+
+.btn {
+    transition: all 0.2s ease-in-out;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+.position-fixed {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+</style>
+
+{% endblock %}

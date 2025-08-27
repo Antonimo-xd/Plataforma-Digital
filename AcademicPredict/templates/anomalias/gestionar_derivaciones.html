@@ -1,0 +1,563 @@
+{% extends 'anomalias/base.html' %}
+
+{% block title %}Gestión de Derivaciones{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-share-alt me-2"></i>Gestión de Derivaciones
+            </h1>
+            <p class="text-muted">Seguimiento de derivaciones a instancias de apoyo</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="btn-group">
+                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#filtrosModal">
+                    <i class="fas fa-filter me-2"></i>Filtros
+                </button>
+                <button type="button" class="btn btn-success" onclick="exportarDerivaciones()">
+                    <i class="fas fa-download me-2"></i>Exportar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Métricas rápidas -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <i class="fas fa-clock fa-2x text-warning mb-2"></i>
+                    <h3 class="mb-0">{{ derivaciones_pendientes }}</h3>
+                    <small class="text-muted">Pendientes</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <i class="fas fa-cogs fa-2x text-info mb-2"></i>
+                    <h3 class="mb-0">{{ derivaciones_proceso }}</h3>
+                    <small class="text-muted">En Proceso</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                    <h3 class="mb-0">{{ derivaciones_completadas }}</h3>
+                    <small class="text-muted">Completadas</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <i class="fas fa-list fa-2x text-primary mb-2"></i>
+                    <h3 class="mb-0">{{ total_derivaciones }}</h3>
+                    <small class="text-muted">Total</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de derivaciones -->
+    <div class="card">
+        <div class="card-body">
+            {% if derivaciones %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Estudiante</th>
+                            <th>Anomalía</th>
+                            <th>Instancia</th>
+                            <th>Estado</th>
+                            <th>Prioridad</th>
+                            <th>Fecha</th>
+                            <th>Derivado por</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for derivacion in derivaciones %}
+                        <tr id="derivacion-{{ derivacion.id }}">
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="me-2">
+                                        <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center">
+                                            {{ derivacion.deteccion_anomalia.estudiante.nombre|first }}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <strong>{{ derivacion.deteccion_anomalia.estudiante.nombre }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ derivacion.deteccion_anomalia.estudiante.carrera.nombre|default:"Sin carrera" }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ derivacion.deteccion_anomalia.get_tipo_anomalia_display }}</span>
+                                <br>
+                                <small class="text-muted">Score: {{ derivacion.deteccion_anomalia.score_anomalia|floatformat:1 }}%</small>
+                            </td>
+                            <td>
+                                <strong>{{ derivacion.instancia_apoyo.nombre }}</strong>
+                                <br>
+                                <small class="text-muted">{{ derivacion.instancia_apoyo.contacto }}</small>
+                            </td>
+                            <td>
+                                <span class="badge estado-derivacion 
+                                    {% if derivacion.estado == 'pendiente' %}bg-warning
+                                    {% elif derivacion.estado == 'enviada' %}bg-info
+                                    {% elif derivacion.estado == 'en_proceso' %}bg-primary
+                                    {% elif derivacion.estado == 'completada' %}bg-success
+                                    {% elif derivacion.estado == 'rechazada' %}bg-danger
+                                    {% else %}bg-secondary
+                                    {% endif %}"
+                                    id="badge-estado-{{ derivacion.id }}">
+                                    {{ derivacion.get_estado_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge 
+                                    {% if derivacion.prioridad == 'alta' %}bg-danger
+                                    {% elif derivacion.prioridad == 'media' %}bg-warning
+                                    {% else %}bg-secondary
+                                    {% endif %}">
+                                    {{ derivacion.get_prioridad_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <span title="{{ derivacion.fecha_derivacion }}">
+                                    {{ derivacion.fecha_derivacion|timesince }} atrás
+                                </span>
+                                <br>
+                                <small class="text-muted">{{ derivacion.fecha_derivacion|date:"d/m/Y" }}</small>
+                            </td>
+                            <td>
+                                {{ derivacion.derivado_por.get_full_name|default:derivacion.derivado_por.username }}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-primary" 
+                                            onclick="verDetalleDerivacion({{ derivacion.id }})" 
+                                            title="Ver detalle">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <div class="dropdown">
+                                        <button class="btn btn-outline-warning dropdown-toggle" 
+                                                data-bs-toggle="dropdown" 
+                                                title="Cambiar estado">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <li><a class="dropdown-item" href="#" onclick="cambiarEstadoDerivacion({{ derivacion.id }}, 'pendiente')">
+                                                <i class="fas fa-clock me-2"></i>Pendiente
+                                            </a></li>
+                                            <li><a class="dropdown-item" href="#" onclick="cambiarEstadoDerivacion({{ derivacion.id }}, 'enviada')">
+                                                <i class="fas fa-paper-plane me-2"></i>Enviada
+                                            </a></li>
+                                            <li><a class="dropdown-item" href="#" onclick="cambiarEstadoDerivacion({{ derivacion.id }}, 'en_proceso')">
+                                                <i class="fas fa-cogs me-2"></i>En Proceso
+                                            </a></li>
+                                            <li><a class="dropdown-item" href="#" onclick="cambiarEstadoDerivacion({{ derivacion.id }}, 'completada')">
+                                                <i class="fas fa-check me-2"></i>Completada
+                                            </a></li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li><a class="dropdown-item text-danger" href="#" onclick="cambiarEstadoDerivacion({{ derivacion.id }}, 'cancelada')">
+                                                <i class="fas fa-times me-2"></i>Cancelada
+                                            </a></li>
+                                        </ul>
+                                    </div>
+                                    <a href="{% url 'detalle_anomalia' derivacion.deteccion_anomalia.pk %}" 
+                                        class="btn btn-outline-info" 
+                                        title="Ver anomalía">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginación -->
+            {% if is_paginated %}
+            <nav aria-label="Paginación de derivaciones">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1">Primera</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Anterior</a>
+                    </li>
+                    {% endif %}
+                    
+                    <li class="page-item active">
+                        <span class="page-link">
+                            Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                        </span>
+                    </li>
+                    
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}">Siguiente</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Última</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                <h5>No hay derivaciones</h5>
+                <p class="text-muted mb-3">No se han creado derivaciones aún.</p>
+                <a href="{% url 'listado_anomalias' %}" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>Crear Primera Derivación
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal de filtros -->
+<div class="modal fade" id="filtrosModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-filter me-2"></i>Filtros de Derivaciones
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="get">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Estado</label>
+                        <select class="form-select" name="estado">
+                            <option value="">Todos los estados</option>
+                            <option value="pendiente" {% if request.GET.estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
+                            <option value="enviada" {% if request.GET.estado == 'enviada' %}selected{% endif %}>Enviada</option>
+                            <option value="en_proceso" {% if request.GET.estado == 'en_proceso' %}selected{% endif %}>En Proceso</option>
+                            <option value="completada" {% if request.GET.estado == 'completada' %}selected{% endif %}>Completada</option>
+                            <option value="cancelada" {% if request.GET.estado == 'cancelada' %}selected{% endif %}>Cancelada</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Instancia de Apoyo</label>
+                        <select class="form-select" name="instancia">
+                            <option value="">Todas las instancias</option>
+                            {% for instancia in instancias_apoyo %}
+                            <option value="{{ instancia.id }}" {% if request.GET.instancia == instancia.id|stringformat:"s" %}selected{% endif %}>
+                                {{ instancia.nombre }}
+                            </option>
+                            {% endfor %}Rechaada
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Fecha desde</label>
+                        <input type="date" class="form-control" name="fecha_desde" value="{{ request.GET.fecha_desde }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Buscar estudiante</label>
+                        <input type="text" class="form-control" name="busqueda" 
+                               value="{{ request.GET.busqueda }}" 
+                               placeholder="Nombre o ID del estudiante">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <a href="{% url 'gestionar_derivaciones' %}" class="btn btn-outline-warning">Limpiar</a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search me-2"></i>Aplicar Filtros
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de detalle de derivación -->
+<div class="modal fade" id="modalDetalleDerivacion" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-info-circle me-2"></i>Detalle de Derivación
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="contenidoDetalleDerivacion">
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para cambiar estado con observaciones -->
+<div class="modal fade" id="modalCambiarEstado" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-edit me-2"></i>Cambiar Estado de Derivación
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formCambiarEstado">
+                <div class="modal-body">
+                    <input type="hidden" id="derivacionId" name="derivacion_id">
+                    <input type="hidden" id="nuevoEstado" name="estado">
+                    
+                    <div class="alert alert-info">
+                        <strong>Estudiante:</strong> <span id="estudianteNombre"></span><br>
+                        <strong>Nuevo estado:</strong> <span id="estadoTexto"></span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Observaciones <small class="text-muted">(opcional)</small></label>
+                        <textarea class="form-control" name="observaciones" rows="3" 
+                                  placeholder="Agrega observaciones sobre el cambio de estado..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Guardar Cambio
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function verDetalleDerivacion(derivacionId) {
+    const modal = new bootstrap.Modal(document.getElementById('modalDetalleDerivacion'));
+    const contenido = document.getElementById('contenidoDetalleDerivacion');
+    
+    // Mostrar loading
+    contenido.innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+        </div>
+    `;
+    
+    modal.show();
+    
+    // Cargar detalle via AJAX
+    fetch(`/cpa/derivaciones/${derivacionId}/detalle/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                contenido.innerHTML = data.html;
+            } else {
+                contenido.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Error cargando el detalle: ${data.error || 'Error desconocido'}
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            contenido.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Error de conexión. Intenta nuevamente.
+                </div>
+            `;
+        });
+}
+
+function cambiarEstadoDerivacion(derivacionId, nuevoEstado) {
+    // Obtener nombre del estudiante de la fila
+    const fila = document.querySelector(`#derivacion-${derivacionId}`);
+    const estudianteNombre = fila.querySelector('strong').textContent;
+    
+    // Estados en español
+    const estadosTexto = {
+        'pendiente': 'Pendiente',
+        'enviada': 'Enviada',
+        'en_proceso': 'En Proceso',
+        'completada': 'Completada',
+        'cancelada': 'Cancelada'
+    };
+    
+    // Llenar modal
+    document.getElementById('derivacionId').value = derivacionId;
+    document.getElementById('nuevoEstado').value = nuevoEstado;
+    document.getElementById('estudianteNombre').textContent = estudianteNombre;
+    document.getElementById('estadoTexto').textContent = estadosTexto[nuevoEstado];
+    
+    // Mostrar modal
+    const modal = new bootstrap.Modal(document.getElementById('modalCambiarEstado'));
+    modal.show();
+}
+
+// Manejar envío del formulario de cambio de estado
+document.getElementById('formCambiarEstado').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const derivacionId = formData.get('derivacion_id');
+    const nuevoEstado = formData.get('estado');
+    const observaciones = formData.get('observaciones');
+    
+    // Preparar datos para envío
+    const datos = new FormData();
+    datos.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    datos.append('estado', nuevoEstado);
+    if (observaciones) {
+        datos.append('observaciones', observaciones);
+    }
+    
+    // Deshabilitar botón
+    const btnSubmit = this.querySelector('button[type="submit"]');
+    const textoOriginal = btnSubmit.innerHTML;
+    btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
+    btnSubmit.disabled = true;
+    
+    // Enviar AJAX
+    fetch(`/cpa/derivaciones/${derivacionId}/actualizar-estado/`, {
+        method: 'POST',
+        body: datos,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Actualizar badge en la tabla
+            const badge = document.querySelector(`#badge-estado-${derivacionId}`);
+            if (badge) {
+                badge.className = `badge estado-derivacion ${getBadgeClass(nuevoEstado)}`;
+                badge.textContent = data.nuevo_estado;
+            }
+            
+            // Cerrar modal
+            bootstrap.Modal.getInstance(document.getElementById('modalCambiarEstado')).hide();
+            
+            // Mostrar notificación
+            mostrarNotificacion(data.message, 'success');
+            
+            // Recargar página después de un momento
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            mostrarNotificacion(data.error || 'Error actualizando el estado', 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        mostrarNotificacion('Error de conexión', 'danger');
+    })
+    .finally(() => {
+        // Restaurar botón
+        btnSubmit.innerHTML = textoOriginal;
+        btnSubmit.disabled = false;
+    });
+});
+
+function getBadgeClass(estado) {
+    const clases = {
+        'pendiente': 'bg-warning',
+        'enviada': 'bg-info',
+        'en_proceso': 'bg-primary',
+        'completada': 'bg-success',
+        'rechazada': 'bg-danger'
+    };
+    return clases[estado] || 'bg-secondary';
+}
+
+function mostrarNotificacion(mensaje, tipo = 'info') {
+    const notif = document.createElement('div');
+    notif.className = `alert alert-${tipo} alert-dismissible fade show position-fixed`;
+    notif.style.cssText = 'top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
+    
+    notif.innerHTML = `
+        ${mensaje}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(notif);
+    
+    setTimeout(() => {
+        if (notif.parentNode) {
+            notif.parentNode.removeChild(notif);
+        }
+    }, 5000);
+}
+
+function exportarDerivaciones() {
+    window.location.href = '{% url "exportar_reporte_derivaciones" %}';
+}
+
+// Actualizar página cada 60 segundos
+setInterval(() => {
+    if (!document.hidden) {
+        window.location.reload();
+    }
+}, 60000);
+</script>
+
+<style>
+.avatar-sm {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.estado-derivacion {
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.dropdown-menu {
+    min-width: 200px;
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.table th {
+    border-top: none;
+    border-bottom: 2px solid #dee2e6;
+    font-weight: 600;
+}
+
+.btn-group-sm .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+</style>
+{% endblock %}

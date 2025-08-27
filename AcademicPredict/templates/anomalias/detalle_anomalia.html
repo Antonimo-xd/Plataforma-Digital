@@ -1,0 +1,553 @@
+<!-- templates/anomalias/detalle_anomalia.html -->
+{% extends 'anomalias/base.html' %}
+{% load filters %}
+
+{% block title %}Detalle de Anomalía - {{ anomalia.estudiante.nombre }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-user-circle me-2"></i>{{ anomalia.estudiante.nombre }}
+            </h1>
+            <p class="text-muted">
+                Anomalía detectada: {{ anomalia.get_tipo_anomalia_display }}
+                <span class="badge badge-priority-{{ anomalia.prioridad }} ms-2">
+                    Prioridad {{ anomalia.prioridad }}
+                </span>
+            </p>
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="btn-group">
+                <a href="{% url 'listado_anomalias' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Volver al Listado
+                </a>
+                {% if user.rol == 'analista_cpa' %}
+                <a href="{% url 'crear_derivacion' anomalia.id %}" class="btn btn-primary">
+                    <i class="fas fa-share me-2"></i>Crear Derivación
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Estado actual de la anomalía -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-{% if anomalia.estado == 'detectado' %}warning{% elif anomalia.estado == 'en_revision' %}info{% elif anomalia.estado == 'intervencion_activa' %}primary{% elif anomalia.estado == 'resuelto' %}success{% else %}secondary{% endif %}">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-1">
+                            <i class="fas fa-{% if anomalia.estado == 'detectado' %}exclamation-triangle{% elif anomalia.estado == 'en_revision' %}search{% elif anomalia.estado == 'intervencion_activa' %}cogs{% elif anomalia.estado == 'resuelto' %}check-circle{% else %}question-circle{% endif %} me-2"></i>
+                            Estado: {{ anomalia.get_estado_display }}
+                        </h5>
+                        <p class="mb-0">
+                            Detectado el {{ anomalia.fecha_deteccion|date:"d/m/Y H:i" }}
+                            {% if anomalia.criterio_usado %}
+                            con criterio "{{ anomalia.criterio_usado.nombre }}"
+                            {% endif %}
+                        </p>
+                    </div>
+                    {% if user.rol in 'analista_cpa,coordinador_cpa' %}
+                    <div>
+                        <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalActualizarEstado">
+                            <i class="fas fa-edit me-1"></i>Actualizar Estado
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Información del estudiante -->
+        <div class="col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-id-card me-2"></i>Información del Estudiante
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <i class="fas fa-user-circle fa-4x text-muted"></i>
+                        <h5 class="mt-2">{{ anomalia.estudiante.nombre }}</h5>
+                        <p class="text-muted">ID: {{ anomalia.estudiante.id_estudiante }}</p>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <h6 class="text-primary">{{ anomalia.estudiante.carrera.nombre }}</h6>
+                            <small class="text-muted">Carrera</small>
+                        </div>
+                        <div class="col-6">
+                            <h6 class="text-info">{{ anomalia.estudiante.ingreso_año }}</h6>
+                            <small class="text-muted">Año Ingreso</small>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="d-grid">
+                        <button class="btn btn-outline-info btn-sm" onclick="verEvolucionEstudiante()">
+                            <i class="fas fa-chart-line me-2"></i>Ver Evolución Académica
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Métricas de la anomalía -->
+        <div class="col-lg-8 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>Métricas de la Anomalía
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="metric-box">
+                                <h3 class="text-danger">{{ anomalia.score_anomalia|floatformat:3 }}</h3>
+                                <p class="mb-0">Score de Anomalía</p>
+                                <small class="text-muted">Menor valor = más anómalo</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="metric-box">
+                                <h3 class="text-info">{{ anomalia.confianza|floatformat:1 }}%</h3>
+                                <p class="mb-0">Confianza</p>
+                                <small class="text-muted">Certeza de la detección</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="metric-box">
+                                <h4 class="{% if anomalia.promedio_general < 3.5 %}text-danger{% elif anomalia.promedio_general < 4.5 %}text-warning{% else %}text-success{% endif %}">
+                                    {{ anomalia.promedio_general|floatformat:2 }}
+                                </h4>
+                                <p class="mb-0">Promedio General</p>
+                                <div class="progress mt-1" style="height: 4px;">
+                                    <div class="progress-bar {% if anomalia.promedio_general < 3.5 %}bg-danger{% elif anomalia.promedio_general < 4.5 %}bg-warning{% else %}bg-success{% endif %}" 
+                                        style="width: {{ anomalia.promedio_general|progress_width }}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="metric-box">
+                                <h4 class="{% if anomalia.asistencia_promedio < 70 %}text-danger{% elif anomalia.asistencia_promedio < 85 %}text-warning{% else %}text-success{% endif %}">
+                                    {{ anomalia.asistencia_promedio|floatformat:1 }}%
+                                </h4>
+                                <p class="mb-0">Asistencia Promedio</p>
+                                <div class="progress mt-1" style="height: 4px;">
+                                    <div class="progress-bar {% if anomalia.asistencia_promedio < 70 %}bg-danger{% elif anomalia.asistencia_promedio < 85 %}bg-warning{% else %}bg-success{% endif %}" 
+                                            style="width: {{ anomalia.asistencia_promedio }}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="metric-box">
+                                <h4 class="{% if anomalia.uso_plataforma_promedio < 60 %}text-danger{% elif anomalia.uso_plataforma_promedio < 80 %}text-warning{% else %}text-success{% endif %}">
+                                    {{ anomalia.uso_plataforma_promedio|floatformat:1 }}%
+                                </h4>
+                                <p class="mb-0">Uso de Plataforma</p>
+                                <div class="progress mt-1" style="height: 4px;">
+                                    <div class="progress-bar {% if anomalia.uso_plataforma_promedio < 60 %}bg-danger{% elif anomalia.uso_plataforma_promedio < 80 %}bg-warning{% else %}bg-success{% endif %}" 
+                                            style="width: {{ anomalia.uso_plataforma_promedio }}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <div class="metric-box">
+                                <h4 class="text-secondary">{{ anomalia.variacion_notas|floatformat:2 }}</h4>
+                                <p class="mb-0">Variación de Notas</p>
+                                <small class="text-muted">Desviación estándar</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="metric-box">
+                                <h4 class="text-primary">{{ anomalia.get_tipo_anomalia_display }}</h4>
+                                <p class="mb-0">Tipo de Anomalía</p>
+                                <small class="text-muted">Principal factor detectado</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Registros académicos del estudiante -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-graduation-cap me-2"></i>Registros Académicos
+                    </h5>
+                    <button class="btn btn-sm btn-outline-primary" onclick="exportarRegistros()">
+                        <i class="fas fa-download me-1"></i>Exportar
+                    </button>
+                </div>
+                <div class="card-body">
+                    {% if registros_estudiante %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Asignatura</th>
+                                    <th>Semestre</th>
+                                    <th>Nota 1</th>
+                                    <th>Nota 2</th>
+                                    <th>Nota 3</th>
+                                    <th>Nota 4</th>
+                                    <th>Promedio</th>
+                                    <th>Asistencia</th>
+                                    <th>Uso Plataforma</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for registro in registros_estudiante %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ registro.asignatura.nombre }}</strong>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ registro.asignatura.semestre }}</span>
+                                    </td>
+                                    <td>{{ registro.nota1 }}</td>
+                                    <td>{{ registro.nota2 }}</td>
+                                    <td>{{ registro.nota3 }}</td>
+                                    <td>{{ registro.nota4 }}</td>
+                                    <td>
+                                        <strong class="{% if registro.promedio_notas < 3.5 %}text-danger{% elif registro.promedio_notas < 4.5 %}text-warning{% else %}text-success{% endif %}">
+                                            {{ registro.promedio_notas }}
+                                        </strong>
+                                    </td>
+                                    <td>
+                                        <span class="{% if registro.porcentaje_asistencia < 70 %}text-danger{% elif registro.porcentaje_asistencia < 85 %}text-warning{% else %}text-success{% endif %}">
+                                            {{ registro.porcentaje_asistencia }}%
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="{% if registro.porcentaje_uso_plataforma < 60 %}text-danger{% elif registro.porcentaje_uso_plataforma < 80 %}text-warning{% else %}text-success{% endif %}">
+                                            {{ registro.porcentaje_uso_plataforma }}%
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No hay registros académicos</h5>
+                        <p class="text-muted">No se encontraron registros para este estudiante.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Derivaciones -->
+    {% if derivaciones %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-share me-2"></i>Historial de Derivaciones
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        {% for derivacion in derivaciones %}
+                        <div class="timeline-item">
+                            <div class="timeline-marker bg-{% if derivacion.estado == 'completada' %}success{% elif derivacion.estado == 'en_proceso' %}primary{% elif derivacion.estado == 'cancelada' %}danger{% else %}warning{% endif %}"></div>
+                            <div class="timeline-content">
+                                <h6 class="mb-1">{{ derivacion.instancia_apoyo.nombre }}</h6>
+                                <p class="mb-1">{{ derivacion.motivo }}</p>
+                                <small class="text-muted">
+                                    {{ derivacion.fecha_derivacion|date:"d/m/Y H:i" }} - 
+                                    {{ derivacion.get_estado_display }} -
+                                    Derivado por: {{ derivacion.derivado_por.get_full_name|default:derivacion.derivado_por.username }}
+                                </small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Gráfico de evolución -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line me-2"></i>Evolución Académica
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="chartEvolucion"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para actualizar estado -->
+<div class="modal fade" id="modalActualizarEstado" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'actualizar_estado_anomalia' anomalia.id %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">Actualizar Estado de Anomalía</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nuevo Estado</label>
+                        <select name="estado" class="form-select" required>
+                            {% for codigo, nombre in estados %}
+                            <option value="{{ codigo }}" {% if codigo == anomalia.estado %}selected{% endif %}>
+                                {{ nombre }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Observaciones</label>
+                        <textarea name="observaciones" class="form-control" rows="3" placeholder="Comentarios sobre el cambio de estado...">{{ anomalia.observaciones }}</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Actualizar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+
+
+document.addEventListener('DOMContentLoaded', function() {
+    const progressBar = document.getElementById('progress-promedio');
+    if (progressBar) {
+        const promedio = parseFloat(progressBar.dataset.promedio);
+        const porcentaje = (promedio / 7.0) * 100; // Convertir escala 1-7 a porcentaje
+        progressBar.style.width = porcentaje + '%';
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Preparar datos para el gráfico
+    const evolucionDatos = {{ evolucion_datos|default:"[]"|safe }};
+    
+    if (evolucionDatos.length > 0) {
+        inicializarGraficoEvolucion(evolucionDatos);
+    }
+});
+
+function inicializarGraficoEvolucion(datos) {
+    const ctx = document.getElementById('chartEvolucion').getContext('2d');
+    
+    // Agrupar datos por semestre
+    const datosPorSemestre = {};
+    datos.forEach(item => {
+        if (!datosPorSemestre[item.semestre]) {
+            datosPorSemestre[item.semestre] = {
+                promedios: [],
+                asistencias: [],
+                usoPlataforma: []
+            };
+        }
+        datosPorSemestre[item.semestre].promedios.push(item.promedio);
+        datosPorSemestre[item.semestre].asistencias.push(item.asistencia);
+        datosPorSemestre[item.semestre].usoPlataforma.push(item.uso_plataforma);
+    });
+    
+    // Calcular promedios por semestre
+    const semestres = [];
+    const promedios = [];
+    const asistencias = [];
+    const usoPlataforma = [];
+    
+    Object.keys(datosPorSemestre).sort().forEach(semestre => {
+        const datos = datosPorSemestre[semestre];
+        semestres.push(`Sem ${semestre}`);
+        promedios.push((datos.promedios.reduce((a, b) => a + b, 0) / datos.promedios.length).toFixed(2));
+        asistencias.push((datos.asistencias.reduce((a, b) => a + b, 0) / datos.asistencias.length).toFixed(1));
+        usoPlataforma.push((datos.usoPlataforma.reduce((a, b) => a + b, 0) / datos.usoPlataforma.length).toFixed(1));
+    });
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: semestres,
+            datasets: [{
+                label: 'Promedio Notas',
+                data: promedios,
+                borderColor: '#3498db',
+                backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                yAxisID: 'y'
+            }, {
+                label: 'Asistencia (%)',
+                data: asistencias,
+                borderColor: '#27ae60',
+                backgroundColor: 'rgba(39, 174, 96, 0.1)',
+                yAxisID: 'y1'
+            }, {
+                label: 'Uso Plataforma (%)',
+                data: usoPlataforma,
+                borderColor: '#f39c12',
+                backgroundColor: 'rgba(243, 156, 18, 0.1)',
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    min: 1,
+                    max: 7,
+                    title: {
+                        display: true,
+                        text: 'Promedio Notas'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    min: 0,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: 'Porcentaje (%)'
+                    },
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                }
+            }
+        }
+    });
+}
+
+function verEvolucionEstudiante() {
+    // Scroll suave al gráfico
+    document.querySelector('#chartEvolucion').scrollIntoView({ 
+        behavior: 'smooth' 
+    });
+}
+
+function exportarRegistros() {
+    const tabla = document.querySelector('table');
+    let csv = '';
+    
+    // Headers
+    const headers = Array.from(tabla.querySelectorAll('thead th')).map(th => th.textContent);
+    csv += headers.join(',') + '\n';
+    
+    // Datos
+    const rows = tabla.querySelectorAll('tbody tr');
+    rows.forEach(row => {
+        const cells = Array.from(row.querySelectorAll('td')).map(td => {
+            return '"' + td.textContent.trim().replace(/"/g, '""') + '"';
+        });
+        csv += cells.join(',') + '\n';
+    });
+    
+    // Descargar
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `registros_{{ anomalia.estudiante.nombre|slugify }}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+</script>
+
+<style>
+.metric-box {
+    text-align: center;
+    padding: 15px;
+    border-radius: 8px;
+    background: #f8f9fa;
+    margin-bottom: 15px;
+}
+
+.chart-container {
+    position: relative;
+    height: 400px;
+}
+
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -35px;
+    top: 5px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.timeline-content {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 3px solid #dee2e6;
+}
+
+.progress {
+    height: 4px;
+}
+
+.badge-priority-1 { background-color: #6c757d; }
+.badge-priority-2 { background-color: #28a745; }
+.badge-priority-3 { background-color: #ffc107; color: #000; }
+.badge-priority-4 { background-color: #fd7e14; }
+.badge-priority-5 { background-color: #dc3545; }
+</style>
+{% endblock %}

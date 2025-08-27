@@ -1,0 +1,560 @@
+{% extends 'anomalias/base.html' %}
+
+{% block title %}Dashboard - Sistema CPA{% endblock %}
+
+{% block extra_css %}
+<!-- Estilos específicos para el dashboard -->
+<style>
+/* Estilos para las métricas principales */
+.metric-card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+}
+
+.metric-card.warning {
+    border-left: 4px solid #f39c12;
+}
+
+.metric-card.danger {
+    border-left: 4px solid #e74c3c;
+}
+
+.metric-card.success {
+    border-left: 4px solid #27ae60;
+}
+
+.metric-card .card-body i {
+    color: #3498db;
+}
+
+.metric-card.warning .card-body i {
+    color: #f39c12;
+}
+
+.metric-card.danger .card-body i {
+    color: #e74c3c;
+}
+
+.metric-card.success .card-body i {
+    color: #27ae60;
+}
+
+/* Estilos para los contenedores de gráficos */
+.chart-container {
+    position: relative;
+    width: 100%;
+}
+
+.chart-container canvas {
+    max-height: 100% !important;
+}
+
+/* Estilos para las cards de gráficos */
+.card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    margin-bottom: 20px;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e3e6f0;
+    border-radius: 10px 10px 0 0 !important;
+    padding: 1rem 1.25rem;
+}
+
+.card-header h5 {
+    color: #5a5c69;
+    font-weight: 600;
+    margin-bottom: 0;
+}
+
+/* Estilos para los listados */
+.border-bottom {
+    border-bottom: 1px solid #e3e6f0 !important;
+}
+
+.badge {
+    font-size: 0.75rem;
+    padding: 0.375rem 0.5rem;
+}
+
+/* Estilos para estados de anomalías */
+.bg-activo {
+    background-color: #f39c12 !important;
+}
+
+.bg-en_revision {
+    background-color: #3498db !important;
+}
+
+.bg-resuelto {
+    background-color: #27ae60 !important;
+}
+
+.bg-derivado {
+    background-color: #9b59b6 !important;
+}
+
+/* Estilos responsivos */
+@media (max-width: 768px) {
+    .chart-container {
+        height: 250px !important;
+    }
+    
+    .metric-card .card-body h3 {
+        font-size: 1.5rem;
+    }
+    
+    .metric-card .card-body i {
+        font-size: 1.5rem !important;
+    }
+}
+
+/* Animaciones para carga */
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #3498db;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Estilos para el indicador de última actualización */
+.text-muted small {
+    font-size: 0.8rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="h3 mb-0">Dashboard</h1>
+            <p class="text-muted">Resumen del estado actual del sistema</p>
+        </div>
+    </div>
+
+    <!-- Métricas principales -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card metric-card">
+                <div class="card-body text-center">
+                    <i class="fas fa-users fa-2x mb-2"></i>
+                    <h3 class="mb-0">{{ total_estudiantes }}</h3>
+                    <p class="mb-0">Total Estudiantes</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card metric-card warning">
+                <div class="card-body text-center">
+                    <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
+                    <h3 class="mb-0">{{ anomalias_activas }}</h3>
+                    <p class="mb-0">Anomalías Activas</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card metric-card danger">
+                <div class="card-body text-center">
+                    <i class="fas fa-fire fa-2x mb-2"></i>
+                    <h3 class="mb-0">{{ anomalias_criticas }}</h3>
+                    <p class="mb-0">Casos Críticos</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card metric-card success">
+                <div class="card-body text-center">
+                    <i class="fas fa-share fa-2x mb-2"></i>
+                    <h3 class="mb-0">{{ derivaciones_pendientes }}</h3>
+                    <p class="mb-0">Derivaciones Pendientes</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráficos principales -->
+    <div class="row mb-4">
+        <!-- Evolución temporal de anomalías -->
+        <div class="col-lg-8 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line me-2"></i>
+                        Evolución de Anomalías (Últimos 30 días)
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container" style="height: 300px;">
+                        <canvas id="chartEvolucion"></canvas>
+                    </div>
+                    <div class="mt-2 text-center">
+                        <small class="text-muted" id="estadisticasEvolucion">
+                            Cargando estadísticas...
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tipos de anomalías -->
+        <div class="col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-pie me-2"></i>
+                        Tipos de Anomalías
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container" style="height: 300px;">
+                        <canvas id="chartTipos"></canvas>
+                    </div>
+                    <div class="mt-2 text-center">
+                        <small class="text-muted" id="estadisticasTipos">
+                            Cargando tipos...
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Listados informativos -->
+    <div class="row">
+        <!-- Últimas anomalías detectadas -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clock me-2"></i>
+                        Últimas Anomalías Detectadas
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% for anomalia in ultimas_anomalias %}
+                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                        <div>
+                            <strong>{{ anomalia.estudiante.nombre }}</strong>
+                            <br>
+                            <small class="text-muted">
+                                {{ anomalia.tipo_anomalia|capfirst }} - 
+                                Score: {{ anomalia.score_anomalia|floatformat:2 }}
+                            </small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-{{ anomalia.estado|default:'secondary' }}">
+                                {{ anomalia.get_estado_display }}
+                            </span>
+                            <br>
+                            <small class="text-muted">
+                                {{ anomalia.fecha_deteccion|date:"d/m H:i" }}
+                            </small>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted mb-0">No hay anomalías recientes</p>
+                    {% endfor %}
+                    
+                    {% if ultimas_anomalias %}
+                    <div class="text-center mt-3">
+                        <a href="{% url 'listado_anomalias' %}" class="btn btn-outline-primary btn-sm">
+                            Ver todas las anomalías
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Asignaturas críticas -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Asignaturas Más Críticas
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% for asignatura in asignaturas_criticas %}
+                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                        <div>
+                            <strong>{{ asignatura.asignatura.nombre }}</strong>
+                            <br>
+                            <small class="text-muted">{{ asignatura.total_estudiantes }} estudiantes</small>
+                        </div>
+                        <div class="text-end">
+                            <span class="text-danger fw-bold">{{ asignatura.porcentaje_anomalias|floatformat:1 }}%</span>
+                            <br>
+                            <small class="text-muted">anomalías</small>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted mb-0">No hay asignaturas críticas</p>
+                    {% endfor %}
+                    
+                    <!-- BOTÓN CONDICIONAL SEGÚN EL ROL -->
+                    <div class="text-center mt-3">
+                        {% if usuario_rol == 'coordinador_carrera' %}
+                            <a href="{% url 'asignaturas_criticas' %}" class="btn btn-outline-danger btn-sm">
+                                Ver análisis de mi carrera
+                            </a>
+                        {% elif usuario_rol == 'coordinador_cpa' or usuario_rol == 'analista_cpa' %}
+                            <a href="{% url 'asignaturas_criticas' %}" class="btn btn-outline-danger btn-sm">
+                                Ver análisis completo
+                            </a>
+                        {% else %}
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Contacta a tu coordinador para más detalles
+                            </small>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Indicador de última actualización -->
+    <div class="row">
+        <div class="col-12">
+            <div class="text-center text-muted">
+                <small>
+                    <i class="fas fa-sync-alt me-1"></i>
+                    Última actualización: {{ ultima_actualizacion|date:"d/m/Y H:i" }}
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js desde CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Inicializando dashboard...');
+    
+    // Variables para almacenar las instancias de los gráficos
+    let chartEvolucion = null;
+    let chartTipos = null;
+    
+    // Función para mostrar mensajes de error
+    function mostrarError(mensaje) {
+        console.error('❌ Error en dashboard:', mensaje);
+        
+        // Mostrar error en los contenedores de estadísticas
+        document.getElementById('estadisticasEvolucion').innerHTML = 
+            '<span class="text-danger">Error cargando datos</span>';
+        document.getElementById('estadisticasTipos').innerHTML = 
+            '<span class="text-danger">Error cargando datos</span>';
+    }
+    
+    // Función para actualizar estadísticas de evolución
+    function actualizarEstadisticasEvolucion(estadisticas) {
+        const elemento = document.getElementById('estadisticasEvolucion');
+        elemento.innerHTML = `
+            Total: ${estadisticas.total_anomalias} anomalías | 
+            Este mes: ${estadisticas.anomalias_mes_actual} | 
+            Promedio diario: ${estadisticas.promedio_diario}
+        `;
+    }
+    
+    // Función para actualizar estadísticas de tipos
+    function actualizarEstadisticasTipos(data) {
+        const elemento = document.getElementById('estadisticasTipos');
+        const total = data.reduce((sum, item) => sum + item.count, 0);
+        elemento.innerHTML = `Total: ${total} anomalías en ${data.length} tipos diferentes`;
+    }
+    
+    // Cargar datos del dashboard
+    fetch('/cpa/api/datos-dashboard/')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('✅ Datos recibidos:', data);
+            
+            if (!data.success) {
+                throw new Error(data.error || 'Error desconocido en la API');
+            }
+            
+            // 1. GRÁFICO DE EVOLUCIÓN TEMPORAL
+            const ctxEvolucion = document.getElementById('chartEvolucion').getContext('2d');
+            
+            // Destruir gráfico anterior si existe
+            if (chartEvolucion) {
+                chartEvolucion.destroy();
+            }
+            
+            chartEvolucion = new Chart(ctxEvolucion, {
+                type: 'line',
+                data: {
+                    labels: data.evolucion_temporal.fechas,
+                    datasets: [{
+                        label: 'Anomalías Detectadas',
+                        data: data.evolucion_temporal.counts,
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        pointBackgroundColor: '#3498db',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false  // Ocultar leyenda ya que solo hay un dataset
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            titleColor: '#ffffff',
+                            bodyColor: '#ffffff',
+                            borderColor: '#3498db',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Fecha'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Cantidad de Anomalías'
+                            },
+                            ticks: {
+                                stepSize: 1  // Mostrar solo números enteros
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Actualizar estadísticas de evolución
+            actualizarEstadisticasEvolucion(data.estadisticas);
+            
+            // 2. GRÁFICO DE TIPOS DE ANOMALÍAS
+            const ctxTipos = document.getElementById('chartTipos').getContext('2d');
+            
+            // Destruir gráfico anterior si existe
+            if (chartTipos) {
+                chartTipos.destroy();
+            }
+            
+            // Preparar datos para el gráfico de dona
+            const tiposLabels = data.anomalias_por_tipo.map(item => item.tipo_anomalia);
+            const tiposData = data.anomalias_por_tipo.map(item => item.count);
+            
+            // Colores predefinidos
+            const colores = [
+                '#e74c3c',  // Rojo
+                '#f39c12',  // Naranja  
+                '#3498db',  // Azul
+                '#27ae60',  // Verde
+                '#9b59b6',  // Púrpura
+                '#34495e'   // Gris oscuro
+            ];
+            
+            chartTipos = new Chart(ctxTipos, {
+                type: 'doughnut',
+                data: {
+                    labels: tiposLabels,
+                    datasets: [{
+                        data: tiposData,
+                        backgroundColor: colores.slice(0, tiposLabels.length),
+                        borderColor: '#ffffff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 15,
+                                usePointStyle: true,
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            titleColor: '#ffffff',
+                            bodyColor: '#ffffff',
+                            callbacks: {
+                                label: function(context) {
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const porcentaje = ((context.parsed / total) * 100).toFixed(1);
+                                    return `${context.label}: ${context.parsed} (${porcentaje}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Actualizar estadísticas de tipos
+            actualizarEstadisticasTipos(data.anomalias_por_tipo);
+            
+            console.log('📊 Gráficos creados exitosamente');
+            
+        })
+        .catch(error => {
+            console.error('❌ Error cargando datos del dashboard:', error);
+            mostrarError(error.message);
+        });
+    
+    // Función para refrescar los datos (opcional, para uso futuro)
+    window.refreshDashboard = function() {
+        console.log('🔄 Refrescando dashboard...');
+        location.reload();
+    };
+    
+    // Auto-refresh cada 5 minutos (opcional)
+    // setInterval(window.refreshDashboard, 5 * 60 * 1000);
+});
+</script>
+{% endblock %}

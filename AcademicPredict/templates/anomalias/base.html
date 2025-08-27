@@ -1,0 +1,555 @@
+<!-- base.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sistema de Detección de Anomalías Académicas{% endblock %}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+            --success-color: #27ae60;
+            --sidebar-width: 250px;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+        }
+        
+        .avatar-sm {
+            width: 32px;
+            height: 32px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .dropdown-menu {
+            min-width: 250px;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+            border: 1px solid rgba(0, 0, 0, 0.125);
+        }
+
+        .dropdown-header {
+            color: #495057;
+            font-weight: 600;
+        }
+
+        .dropdown-item {
+            padding: 0.5rem 1rem;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .dropdown-item:hover {
+            background-color: #f8f9fa;
+            transform: translateX(2px);
+        }
+
+        .dropdown-item-text {
+            padding: 0.25rem 1rem;
+        }
+
+        .dropdown-divider {
+            margin: 0.5rem 0;
+        }
+
+        @media (max-width: 768px) {
+            .dropdown-menu {
+                min-width: 200px;
+            }
+        }
+
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: var(--sidebar-width);
+            background: linear-gradient(135deg, var(--primary-color), #34495e);
+            color: white;
+            z-index: 1000;
+            overflow-y: auto;
+        }
+        
+        .avatar-circle {
+            width: 40px; height: 40px; border-radius: 50%; 
+            background: #3498db; color: white; display: flex; 
+            align-items: center; justify-content: center; font-weight: bold;
+        }
+
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            border-radius: 8px;
+            margin: 2px 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar .nav-link:hover,
+        .sidebar .nav-link.active {
+            color: white;
+            background-color: rgba(255, 255, 255, 0.1);
+            transform: translateX(5px);
+        }
+        
+        .main-content {
+            margin-left: var(--sidebar-width);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .navbar-custom {
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .card {
+            border: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            transition: transform 0.2s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .metric-card {
+            background: linear-gradient(135deg, var(--secondary-color), #5dade2);
+            color: white;
+        }
+        
+        .metric-card.danger {
+            background: linear-gradient(135deg, var(--danger-color), #ec7063);
+        }
+        
+        .metric-card.warning {
+            background: linear-gradient(135deg, var(--warning-color), #f7dc6f);
+        }
+        
+        .metric-card.success {
+            background: linear-gradient(135deg, var(--success-color), #58d68d);
+        }
+        
+        .badge-priority-1 { background-color: #6c757d; }
+        .badge-priority-2 { background-color: #28a745; }
+        .badge-priority-3 { background-color: #ffc107; color: #000; }
+        .badge-priority-4 { background-color: #fd7e14; }
+        .badge-priority-5 { background-color: #dc3545; }
+        
+        .alert-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            min-width: 300px;
+        }
+        
+        .table-hover tbody tr:hover {
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+        
+        .btn-custom {
+            border-radius: 8px;
+            font-weight: 500;
+            padding: 8px 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-custom:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .loading-spinner {
+            display: none;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 400px;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                margin-left: calc(-1 * var(--sidebar-width));
+                transition: margin-left 0.3s ease;
+            }
+            
+            .sidebar.show {
+                margin-left: 0;
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="p-3 border-bottom">
+            <h5 class="mb-0">
+                <i class="fas fa-chart-line me-2"></i>
+                CPA Analytics
+            </h5>
+            <small class="text-muted">Sistema de Detección de Anomalías</small>
+        </div>
+        
+        <div class="p-3">
+            <div class="mb-3 d-flex align-items-center">
+                <div class="avatar-circle me-2" title="{{ user.get_full_name|default:user.username }}">
+                    {% if user.first_name and user.last_name %}
+                        {{ user.first_name.0|upper }}{{ user.last_name.0|upper }}
+                    {% elif user.first_name %}
+                        {{ user.first_name.0|upper }}{{ user.first_name.1|upper|default:'' }}
+                    {% else %}
+                        {{ user.username.0|upper }}{{ user.username.1|upper|default:'' }}
+                    {% endif %}
+                </div>
+                <div> 
+                    <div class="text-white">{{ user.get_full_name|default:user.username }}</div>
+                    <small class="text-muted">{{ user.get_rol_display }}</small>
+                </div>
+            </div>
+            
+            <!-- Alertas no leídas -->
+            {% if user.is_authenticated %}
+            <div class="alert alert-info py-2 px-3 small">
+                <i class="fas fa-bell me-1"></i>
+                <span id="alertas-count">{{ alertas_no_leidas|default:0 }}</span> alertas nuevas
+            </div>
+            {% endif %}
+        </div>
+        
+        <ul class="nav nav-pills flex-column px-3">
+            <li class="nav-item">
+                <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" 
+                    href="{% url 'dashboard' %}">
+                    <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                </a>
+            </li>
+            
+            {% if user.rol == 'analista_cpa' or user.rol == 'coordinador_cpa' %}
+            <li class="nav-item">
+                <a class="nav-link {% if 'anomalias' in request.resolver_match.url_name %}active{% endif %}" 
+                    href="{% url 'listado_anomalias' %}">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Anomalías Detectadas
+                </a>
+            </li>
+            
+            <li class="nav-item">
+                <a class="nav-link {% if 'derivaciones' in request.resolver_match.url_name %}active{% endif %}" 
+                    href="{% url 'gestionar_derivaciones' %}">
+                    <i class="fas fa-share me-2"></i>Derivaciones
+                </a>
+            </li>
+            
+            <li class="nav-item">
+                <a class="nav-link {% if 'alertas' in request.resolver_match.url_name %}active{% endif %}" 
+                    href="{% url 'alertas_usuario' %}">
+                    <i class="fas fa-bell me-2"></i>Alertas
+                </a>
+            </li>
+            {% endif %}
+            
+            {% if user.rol == 'coordinador_cpa' %}
+            <!-- Sección de Configuración -->
+            <li class="nav-item mt-3">
+                <hr class="dropdown-divider" style="border-color: rgba(255,255,255,0.2);">
+                <small class="text-muted px-3">CONFIGURACIÓN</small>
+            </li>
+            
+            <li class="nav-item">
+                <a class="nav-link {% if 'criterios' in request.resolver_match.url_name %}active{% endif %}" 
+                    href="{% url 'configuracion_criterios' %}">
+                    <i class="fas fa-cogs me-2"></i>Criterios de Detección
+                </a>
+            </li>
+            
+            <li class="nav-item">
+                <a class="nav-link {% if 'importar-datos' in request.resolver_match.url_name %}active{% endif %}" 
+                    href="{% url 'importar_datos_web' %}">
+                    <i class="fas fa-cloud-upload-alt me-2"></i>Importar Datos
+                </a>
+            </li>
+            
+            <li class="nav-item">
+                <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#modalGestionUsuarios">
+                    <i class="fas fa-users-cog me-2"></i>Gestión de Usuarios
+                </a>
+            </li>
+            {% endif %}
+            
+            {% if user.rol == 'coordinador_carrera' %}
+            <li class="nav-item">
+                <a class="nav-link {% if 'asignaturas_criticas' in request.resolver_match.url_name %}active{% endif %}" 
+                    href="{% url 'asignaturas_criticas' %}">
+                    <i class="fas fa-book me-2"></i>Asignaturas Críticas
+                </a>
+            </li>
+            {% endif %}
+            
+            <!-- Sección de Herramientas -->
+            <li class="nav-item mt-3">
+                <hr class="dropdown-divider" style="border-color: rgba(255,255,255,0.2);">
+                <small class="text-muted px-3">HERRAMIENTAS</small>
+            </li>
+            
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'exportar_reporte_anomalias' %}">
+                    <i class="fas fa-download me-2"></i>Exportar Reportes
+                </a>
+            </li>
+            
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'ayuda_documentacion' %}">
+                    <i class="fas fa-question-circle me-2"></i>Ayuda y Documentación
+                </a>
+            </li>
+            
+            <!-- Cerrar Sesión -->
+            <li class="nav-item mt-3">
+                <hr class="dropdown-divider" style="border-color: rgba(255,255,255,0.2);">
+                <form method="post" action="{% url 'logout' %}" style="display: inline; width: 100%;">
+                    {% csrf_token %}
+                    <button type="submit" class="nav-link text-light" style="background: none; border: none; cursor: pointer; width: 100%; text-align: left; padding: 8px 12px;">
+                        <i class="fas fa-sign-out-alt me-2"></i>Cerrar Sesión
+                    </button>
+                </form>
+            </li>
+        </ul>
+    </nav>
+ 
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Top Navbar -->
+        <nav class="navbar navbar-expand-lg navbar-custom">
+            <div class="container-fluid">
+                <button class="btn btn-outline-secondary d-lg-none" type="button" id="sidebarToggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <!-- Menú de usuario en navbar -->
+                <div class="navbar-nav ms-auto">
+                    <div class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" 
+                        id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2">
+                                {{ user.first_name|first|default:user.username|first }}
+                            </div>
+                            <span class="d-none d-md-inline">
+                                {{ user.get_full_name|default:user.username }}
+                            </span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <h6 class="dropdown-header">
+                                    <i class="fas fa-user-circle me-2"></i>
+                                    {{ user.get_full_name|default:user.username }}
+                                </h6>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            
+                            <!-- Enlace al perfil -->
+                            <li>
+                                <a class="dropdown-item" href="{% url 'perfil_usuario' %}">
+                                    <i class="fas fa-user-edit me-2"></i>Mi Perfil
+                                </a>
+                            </li>
+                            
+                            <!-- Información del rol -->
+                            <li>
+                                <span class="dropdown-item-text">
+                                    <i class="fas fa-id-badge me-2"></i>
+                                    <small class="text-muted">{{ user.get_rol_display }}</small>
+                                </span>
+                            </li>
+                            
+                            <li><hr class="dropdown-divider"></li>
+                            
+                            <!-- Acciones rápidas según el rol -->
+                            {% if user.rol == 'coordinador_cpa' %}
+                            <li>
+                                <a class="dropdown-item" href="{% url 'configuracion_criterios' %}">
+                                    <i class="fas fa-cogs me-2"></i>Configurar Criterios
+                                </a>
+                            </li>
+                            {% endif %}
+                            
+                            {% if user.rol in 'analista_cpa,coordinador_cpa' %}
+                            <li>
+                                <a class="dropdown-item" href="{% url 'gestionar_derivaciones' %}">
+                                    <i class="fas fa-share-alt me-2"></i>Gestionar Derivaciones
+                                </a>
+                            </li>
+                            {% endif %}
+                            
+                            {% if user.rol == 'coordinador_carrera' %}
+                            <li>
+                                <a class="dropdown-item" href="{% url 'asignaturas_criticas' %}">
+                                    <i class="fas fa-fire me-2"></i>Asignaturas Críticas
+                                </a>
+                            </li>
+                            {% endif %}
+                            
+                            <li><hr class="dropdown-divider"></li>
+                            
+                            <!-- Herramientas del sistema -->
+                            <li>
+                                <a class="dropdown-item" href="{% url 'verificar_sistema' %}">
+                                    <i class="fas fa-tools me-2"></i>Verificar Sistema
+                                </a>
+                            </li>
+                            
+                            {% if user.is_staff %}
+                            <li>
+                                <a class="dropdown-item" href="/admin/" target="_blank">
+                                    <i class="fas fa-cog me-2"></i>Administración
+                                </a>
+                            </li>
+                            {% endif %}
+                            
+                            <li><hr class="dropdown-divider"></li>
+                            
+                            <!-- Cerrar sesión -->
+                            <li>
+                                <form method="post" action="{% url 'logout' %}" class="d-inline w-100">
+                                    {% csrf_token %}
+                                    <button type="submit" class="dropdown-item text-danger w-100 text-start border-0 bg-transparent">
+                                        <i class="fas fa-sign-out-alt me-2"></i>Cerrar Sesión
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Messages -->
+        {% if messages %}
+        <div class="alert-notification">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Page Content -->
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JS -->
+    <script>
+        // Toggle sidebar en móvil
+        document.getElementById('sidebarToggle')?.addEventListener('click', function() {
+            document.querySelector('.sidebar').classList.toggle('show');
+        });
+
+        // Auto-hide alerts
+        setTimeout(function() {
+            document.querySelectorAll('.alert-notification .alert').forEach(function(alert) {
+                var bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            });
+        }, 5000);
+
+        // Actualizar contador de alertas
+        function actualizarContadorAlertas() {
+    fetch('/cpa/api/alertas/count/')  // ← Agregar /cpa/ prefijo
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('alertas-count').textContent = data.count;
+        })
+        .catch(error => {
+            console.error('Error actualizando alertas:', error);
+        });
+}
+
+// Actualizar cada 30 segundos
+setInterval(actualizarContadorAlertas, 30000);
+    </script>
+
+    {% block extra_js %}{% endblock %}
+
+    <!-- Modal Gestión de Usuarios -->
+    <div class="modal fade" id="modalGestionUsuarios" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-users-cog me-2"></i>Gestión de Usuarios
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Usuarios Actuales del Sistema:</strong>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Usuario</th>
+                                    <th>Nombre</th>
+                                    <th>Rol</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>admin</td>
+                                    <td>Administrador Sistema</td>
+                                    <td><span class="badge bg-primary">Coordinador CPA</span></td>
+                                    <td><span class="badge bg-success">Activo</span></td>
+                                </tr>
+                                <tr>
+                                    <td>analista1</td>
+                                    <td>María González</td>
+                                    <td><span class="badge bg-info">Analista CPA</span></td>
+                                    <td><span class="badge bg-success">Activo</span></td>
+                                </tr>
+                                <tr>
+                                    <td>coord_carrera1</td>
+                                    <td>Ana Martínez</td>
+                                    <td><span class="badge bg-warning">Coordinador Carrera</span></td>
+                                    <td><span class="badge bg-success">Activo</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <small>
+                            <strong>Nota:</strong> Para crear nuevos usuarios, usar el comando:
+                            <code>python manage.py createsuperuser</code>
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

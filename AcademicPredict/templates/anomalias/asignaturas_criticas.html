@@ -1,0 +1,313 @@
+{% extends 'anomalias/base.html' %}
+
+{% block title %}Asignaturas Críticas - Sistema CPA{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-exclamation-triangle me-2 text-danger"></i>
+                Asignaturas Críticas
+            </h1>
+            {% if carrera %}
+            <p class="text-muted">Carrera: {{ carrera.nombre }}</p>
+            {% else %}
+            <p class="text-muted">Todas las carreras</p>
+            {% endif %}
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="btn-group" role="group">
+                <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-1"></i>Volver
+                </a>
+                <button type="button" class="btn btn-info" onclick="location.reload()">
+                    <i class="fas fa-sync-alt me-1"></i>Actualizar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estadísticas básicas -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-primary">
+                <div class="card-body text-center">
+                    <i class="fas fa-book fa-2x text-primary mb-2"></i>
+                    <h3 class="mb-0">{{ total_asignaturas|default:"0" }}</h3>
+                    <p class="mb-0">Total Asignaturas</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-danger">
+                <div class="card-body text-center">
+                    <i class="fas fa-exclamation-triangle fa-2x text-danger mb-2"></i>
+                    <h3 class="mb-0">{{ total_criticas|default:"0" }}</h3>
+                    <p class="mb-0">Asignaturas Críticas</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-warning">
+                <div class="card-body text-center">
+                    <i class="fas fa-percentage fa-2x text-warning mb-2"></i>
+                    <h3 class="mb-0">{{ promedio_anomalias_carrera|default:"0"|floatformat:1 }}%</h3>
+                    <p class="mb-0">Promedio de Anomalías</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-info">
+                <div class="card-body text-center">
+                    <i class="fas fa-chart-line fa-2x text-info mb-2"></i>
+                    <h3 class="mb-0">{{ umbral_criticidad|default:"15" }}%</h3>
+                    <p class="mb-0">Umbral Crítico</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de asignaturas críticas -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list me-2"></i>
+                        {% if asignaturas_criticas %}
+                        Asignaturas con Mayor Criticidad (≥{{ umbral_criticidad|default:"15" }}% anomalías)
+                        {% else %}
+                        Estado de las Asignaturas
+                        {% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if asignaturas_criticas %}
+                        <!-- Tabla de asignaturas críticas -->
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th><i class="fas fa-book me-1"></i>Asignatura</th>
+                                        <th class="text-center"><i class="fas fa-users me-1"></i>Estudiantes</th>
+                                        <th class="text-center"><i class="fas fa-exclamation me-1"></i>Anomalías</th>
+                                        <th class="text-center"><i class="fas fa-percentage me-1"></i>% Anomalías</th>
+                                        <th class="text-center"><i class="fas fa-signal me-1"></i>Nivel</th>
+                                        {% if mostrar_todas_carreras %}
+                                        <th class="text-center"><i class="fas fa-graduation-cap me-1"></i>Carrera</th>
+                                        {% endif %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for asignatura in asignaturas_criticas %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ asignatura.asignatura.nombre }}</strong>
+                                            <br>
+                                            <small class="text-muted">
+                                                <i class="fas fa-layer-group me-1"></i>Semestre {{ asignatura.asignatura.semestre }}
+                                            </small>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge bg-info fs-6">
+                                                {{ asignatura.total_estudiantes }}
+                                            </span>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge bg-warning fs-6">
+                                                {{ asignatura.total_anomalias }}
+                                            </span>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge 
+                                                {% if asignatura.porcentaje_anomalias >= 30 %}bg-danger
+                                                {% elif asignatura.porcentaje_anomalias >= 20 %}bg-warning
+                                                {% else %}bg-secondary{% endif %} fs-6">
+                                                {{ asignatura.porcentaje_anomalias }}%
+                                            </span>
+                                        </td>
+                                        <td class="text-center">
+                                            {% if asignatura.nivel_criticidad == 'muy_alta' %}
+                                                <span class="badge bg-danger">
+                                                    <i class="fas fa-fire me-1"></i>Muy Alta
+                                                </span>
+                                            {% elif asignatura.nivel_criticidad == 'alta' %}
+                                                <span class="badge bg-warning">
+                                                    <i class="fas fa-exclamation-triangle me-1"></i>Alta
+                                                </span>
+                                            {% elif asignatura.nivel_criticidad == 'media' %}
+                                                <span class="badge bg-secondary">
+                                                    <i class="fas fa-minus me-1"></i>Media
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-check me-1"></i>Baja
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        {% if mostrar_todas_carreras %}
+                                        <td class="text-center">
+                                            <small class="text-muted">{{ asignatura.carrera_nombre }}</small>
+                                        </td>
+                                        {% endif %}
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Resumen al final de la tabla -->
+                        <div class="mt-3 p-3 bg-light rounded">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <h6 class="mb-1">
+                                        <i class="fas fa-info-circle me-2"></i>Resumen del Análisis
+                                    </h6>
+                                    <p class="mb-0 text-muted">
+                                        Se encontraron <strong>{{ total_criticas }} asignaturas críticas</strong> 
+                                        de un total de <strong>{{ total_asignaturas }} asignaturas analizadas</strong>.
+                                        El promedio de anomalías en {% if carrera %}{{ carrera.nombre }}{% else %}todas las carreras{% endif %} 
+                                        es de <strong>{{ promedio_anomalias_carrera }}%</strong>.
+                                    </p>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <div class="progress" style="height: 25px;">
+                                        <div class="progress-bar 
+                                            {% if promedio_anomalias_carrera >= 20 %}bg-danger
+                                            {% elif promedio_anomalias_carrera >= 15 %}bg-warning
+                                            {% else %}bg-success{% endif %}" 
+                                            role="progressbar" 
+                                            style="width: {{ promedio_anomalias_carrera|floatformat:0 }}%"
+                                            aria-valuenow="{{ promedio_anomalias_carrera }}" 
+                                            aria-valuemin="0" 
+                                            aria-valuemax="100">
+                                            {{ promedio_anomalias_carrera }}%
+                                        </div>
+                                    </div>
+                                    <small class="text-muted">Nivel promedio de criticidad</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                    {% else %}
+                        <!-- Mensaje cuando no hay asignaturas críticas -->
+                        <div class="text-center py-5">
+                            {% if total_asignaturas > 0 %}
+                                <!-- Hay asignaturas pero ninguna es crítica -->
+                                <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
+                                <h4 class="text-success">¡Excelente!</h4>
+                                <h5 class="text-muted">No hay asignaturas críticas</h5>
+                                <p class="text-muted">
+                                    Se analizaron <strong>{{ total_asignaturas }} asignaturas</strong> 
+                                    {% if carrera %}de {{ carrera.nombre }}{% endif %} 
+                                    y ninguna superó el umbral del {{ umbral_criticidad }}% de anomalías.
+                                </p>
+                                <p class="text-muted">
+                                    Promedio de anomalías: <strong>{{ promedio_anomalias_carrera }}%</strong>
+                                </p>
+                                
+                                <div class="mt-4">
+                                    <a href="{% url 'listado_anomalias' %}" class="btn btn-outline-primary me-2">
+                                        <i class="fas fa-list me-1"></i>Ver Todas las Anomalías
+                                    </a>
+                                    <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                                        <i class="fas fa-home me-1"></i>Ir al Dashboard
+                                    </a>
+                                </div>
+                            {% else %}
+                                <!-- No hay asignaturas para analizar -->
+                                <i class="fas fa-chart-bar fa-4x text-muted mb-3"></i>
+                                <h5 class="text-muted">No hay asignaturas para analizar</h5>
+                                <p class="text-muted">
+                                    {% if carrera %}
+                                    Aún no se han cargado datos suficientes para la carrera {{ carrera.nombre }}.
+                                    {% else %}
+                                    Aún no se han cargado datos suficientes en el sistema.
+                                    {% endif %}
+                                </p>
+                                
+                                <div class="mt-4">
+                                    <a href="{% url 'importar_datos_web' %}" class="btn btn-outline-primary me-2">
+                                        <i class="fas fa-upload me-1"></i>Importar Datos
+                                    </a>
+                                    <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                                        <i class="fas fa-home me-1"></i>Ir al Dashboard
+                                    </a>
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Información adicional y ayuda -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card border-info">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0">
+                        <i class="fas fa-lightbulb me-2"></i>¿Qué significa "Asignatura Crítica"?
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p class="mb-2">Una asignatura se considera <strong>crítica</strong> cuando:</p>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success me-2"></i>Tiene ≥{{ umbral_criticidad }}% de estudiantes con anomalías activas</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Las anomalías están en estado: detectado, en revisión o intervención activa</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Se consideran solo estudiantes activos en el análisis</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Niveles de criticidad:</strong></p>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-circle text-success me-2"></i><10% - Normal</li>
+                                <li><i class="fas fa-circle text-info me-2"></i>10-15% - Baja</li>
+                                <li><i class="fas fa-circle text-secondary me-2"></i>15-20% - Media</li>
+                                <li><i class="fas fa-circle text-warning me-2"></i>20-30% - Alta</li>
+                                <li><i class="fas fa-circle text-danger me-2"></i>≥30% - Muy Alta</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Debug info (solo si hay error) -->
+    {% if debug_info %}
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <small><i class="fas fa-info-circle me-1"></i>{{ debug_info }}</small>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto-actualizar cada 5 minutos (opcional)
+// setInterval(function() {
+//     location.reload();
+// }, 5 * 60 * 1000);
+
+// Función para mostrar más detalles en hover
+document.addEventListener('DOMContentLoaded', function() {
+    // Agregar tooltips a los badges de nivel de criticidad
+    const badges = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    badges.forEach(badge => {
+        new bootstrap.Tooltip(badge);
+    });
+});
+</script>
+{% endblock %}

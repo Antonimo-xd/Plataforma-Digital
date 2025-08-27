@@ -1,0 +1,154 @@
+{% extends 'anomalias/base.html' %}
+
+{% block title %}Crear Criterio{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-plus me-2"></i>
+                Crear Nuevo Criterio
+            </h1>
+            <p class="text-muted">Configurar criterio de detección de anomalías</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-cogs me-2"></i>
+                        Configuración del Criterio
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="{{ form.nombre.id_for_label }}" class="form-label">{{ form.nombre.label }}</label>
+                                {{ form.nombre }}
+                                {% if form.nombre.help_text %}
+                                <div class="form-text">{{ form.nombre.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="{{ form.descripcion.id_for_label }}" class="form-label">{{ form.descripcion.label }}</label>
+                                {{ form.descripcion }}
+                                {% if form.descripcion.help_text %}
+                                <div class="form-text">{{ form.descripcion.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.carrera.id_for_label }}" class="form-label">{{ form.carrera.label }}</label>
+                                {{ form.carrera }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.semestre.id_for_label }}" class="form-label">{{ form.semestre.label }}</label>
+                                {{ form.semestre }}
+                            </div>
+                        </div>
+
+                        <hr>
+                        <h6 class="mb-3">Parámetros del Modelo</h6>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.contamination_rate.id_for_label }}" class="form-label">{{ form.contamination_rate.label }}</label>
+                                {{ form.contamination_rate }}
+                                {% if form.contamination_rate.help_text %}
+                                <div class="form-text">{{ form.contamination_rate.help_text }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.n_estimators.id_for_label }}" class="form-label">{{ form.n_estimators.label }}</label>
+                                {{ form.n_estimators }}
+                                {% if form.n_estimators.help_text %}
+                                <div class="form-text">{{ form.n_estimators.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <hr>
+                        <h6 class="mb-3">Umbrales de Clasificación</h6>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.umbral_promedio_min.id_for_label }}" class="form-label">{{ form.umbral_promedio_min.label }}</label>
+                                {{ form.umbral_promedio_min }}
+                                {% if form.umbral_promedio_min.help_text %}
+                                <div class="form-text">{{ form.umbral_promedio_min.help_text }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.umbral_asistencia_min.id_for_label }}" class="form-label">{{ form.umbral_asistencia_min.label }}</label>
+                                {{ form.umbral_asistencia_min }}
+                                {% if form.umbral_asistencia_min.help_text %}
+                                <div class="form-text">{{ form.umbral_asistencia_min.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.umbral_uso_plataforma_min.id_for_label }}" class="form-label">{{ form.umbral_uso_plataforma_min.label }}</label>
+                                {{ form.umbral_uso_plataforma_min }}
+                                {% if form.umbral_uso_plataforma_min.help_text %}
+                                <div class="form-text">{{ form.umbral_uso_plataforma_min.help_text }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.umbral_variacion_notas.id_for_label }}" class="form-label">{{ form.umbral_variacion_notas.label }}</label>
+                                {{ form.umbral_variacion_notas }}
+                                {% if form.umbral_variacion_notas.help_text %}
+                                <div class="form-text">{{ form.umbral_variacion_notas.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'configuracion_criterios' %}" class="btn btn-secondary">
+                                <i class="fas fa-times me-2"></i>Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Guardar Criterio
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-question-circle me-2"></i>
+                        Ayuda
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <small>
+                        <h6>Recomendaciones:</h6>
+                        <ul>
+                            <li><strong>Tasa de contaminación:</strong> Comienza con 0.1 (10%)</li>
+                            <li><strong>Estimadores:</strong> 100 es un buen valor inicial</li>
+                            <li><strong>Promedio mínimo:</strong> 3.0 para detectar estudiantes en riesgo</li>
+                            <li><strong>Asistencia mínima:</strong> 70% es estándar universitario</li>
+                        </ul>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

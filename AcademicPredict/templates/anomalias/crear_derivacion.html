@@ -1,0 +1,153 @@
+<!-- templates/anomalias/crear_derivacion.html -->
+{% extends 'anomalias/base.html' %}
+
+{% block title %}Crear Derivación{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-share me-2"></i>Crear Derivación
+            </h1>
+            <p class="text-muted">Derivar estudiante a instancia de apoyo</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'detalle_anomalia' anomalia.id %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Volver al Detalle
+            </a>
+        </div>
+    </div>
+
+    <!-- Información de la anomalía -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <h5 class="mb-2">
+                    <i class="fas fa-user me-2"></i>{{ anomalia.estudiante.nombre }}
+                </h5>
+                <div class="row">
+                    <div class="col-md-3">
+                        <strong>ID:</strong> {{ anomalia.estudiante.id_estudiante }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Carrera:</strong> {{ anomalia.estudiante.carrera.nombre }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Tipo Anomalía:</strong> {{ anomalia.get_tipo_anomalia_display }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Prioridad:</strong> 
+                        <span class="badge badge-priority-{{ anomalia.prioridad }}">{{ anomalia.prioridad }}</span>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-4">
+                        <strong>Promedio:</strong> {{ anomalia.promedio_general|floatformat:2 }}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Asistencia:</strong> {{ anomalia.asistencia_promedio|floatformat:1 }}%
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Score:</strong> {{ anomalia.score_anomalia|floatformat:3 }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulario de derivación -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clipboard-list me-2"></i>Datos de la Derivación
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.instancia_apoyo.id_for_label }}" class="form-label">
+                                {{ form.instancia_apoyo.label }}
+                            </label>
+                            {{ form.instancia_apoyo }}
+                            <div class="form-text">Selecciona la instancia más apropiada según el tipo de anomalía</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.motivo.id_for_label }}" class="form-label">
+                                {{ form.motivo.label }}
+                            </label>
+                            {{ form.motivo }}
+                            <div class="form-text">
+                                Describe el motivo de la derivación y las acciones recomendadas
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.observaciones_derivacion.id_for_label }}" class="form-label">
+                                {{ form.observaciones_derivacion.label }}
+                            </label>
+                            {{ form.observaciones_derivacion }}
+                            <div class="form-text">Información adicional que pueda ser útil</div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'detalle_anomalia' anomalia.id %}" class="btn btn-secondary">
+                                <i class="fas fa-times me-2"></i>Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-share me-2"></i>Crear Derivación
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel de ayuda -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-lightbulb me-2"></i>Instancias de Apoyo Disponibles
+                    </h6>
+                </div>
+                <div class="card-body">
+                    {% for instancia in instancias_apoyo %}
+                    <div class="border-bottom pb-2 mb-2">
+                        <h6 class="mb-1">{{ instancia.nombre }}</h6>
+                        <small class="text-muted">{{ instancia.get_tipo_display }}</small>
+                        <p class="small mb-1">{{ instancia.descripcion }}</p>
+                        <small class="text-muted">
+                            <i class="fas fa-envelope me-1"></i>{{ instancia.email }}
+                        </small>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>Recomendaciones
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <small>
+                        <ul class="mb-0">
+                            <li><strong>Bajo rendimiento:</strong> Tutoría académica</li>
+                            <li><strong>Baja asistencia:</strong> Orientación estudiantil</li>
+                            <li><strong>Alta variabilidad:</strong> Psicopedagogía</li>
+                            <li><strong>Problemas múltiples:</strong> Clínica de aprendizaje</li>
+                        </ul>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

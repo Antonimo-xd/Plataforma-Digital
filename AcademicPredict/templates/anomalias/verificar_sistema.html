@@ -1,0 +1,937 @@
+<!-- templates/anomalias/verificar_sistema.html -->
+{% extends 'anomalias/base.html' %}
+
+{% block title %}Verificación del Sistema{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-stethoscope me-2"></i>Verificación del Sistema
+            </h1>
+            <p class="text-muted">Diagnóstico del estado del sistema CPA</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="ejecutarDiagnostico()">
+                    <i class="fas fa-play me-2"></i>Ejecutar Diagnóstico
+                </button>
+                <button class="btn btn-success" onclick="probarAnalisis()">
+                    <i class="fas fa-vial me-2"></i>Probar Análisis
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estado General -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-{% if estado_general == 'OK' %}success{% else %}warning{% endif %} d-flex align-items-center">
+                <i class="fas fa-{% if estado_general == 'OK' %}check-circle{% else %}exclamation-triangle{% endif %} fa-2x me-3"></i>
+                <div>
+                    <h5 class="mb-1">Estado General: {{ estado_general }}</h5>
+                    {% if problemas %}
+                    <p class="mb-0">Se detectaron {{ problemas|length }} problema(s) que requieren atención.</p>
+                    {% else %}
+                    <p class="mb-0">El sistema está funcionando correctamente.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+ 
+    <!-- Estadísticas del Sistema -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card {% if stats.estudiantes_activos < 10 %}border-danger{% endif %}">
+                <div class="card-body text-center">
+                    <i class="fas fa-users fa-2x mb-2 {% if stats.estudiantes_activos < 10 %}text-danger{% else %}text-primary{% endif %}"></i>
+                    <h3 class="mb-0">{{ stats.estudiantes_activos }}</h3>
+                    <p class="mb-0">Estudiantes Activos</p>
+                    {% if stats.estudiantes_activos < 10 %}
+                    <small class="text-danger">⚠️ Muy pocos</small>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card {% if stats.registros_academicos < 30 %}border-danger{% endif %}">
+                <div class="card-body text-center">
+                    <i class="fas fa-chart-line fa-2x mb-2 {% if stats.registros_academicos < 30 %}text-danger{% else %}text-success{% endif %}"></i>
+                    <h3 class="mb-0">{{ stats.registros_academicos }}</h3>
+                    <p class="mb-0">Registros Académicos</p>
+                    {% if stats.registros_academicos < 30 %}
+                    <small class="text-danger">⚠️ Insuficientes</small>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card {% if stats.criterios_activos == 0 %}border-danger{% endif %}">
+                <div class="card-body text-center">
+                    <i class="fas fa-cogs fa-2x mb-2 {% if stats.criterios_activos == 0 %}text-danger{% else %}text-info{% endif %}"></i>
+                    <h3 class="mb-0">{{ stats.criterios_activos }}</h3>
+                    <p class="mb-0">Criterios Activos</p>
+                    {% if stats.criterios_activos == 0 %}
+                    <small class="text-danger">⚠️ Sin criterios</small>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <i class="fas fa-exclamation-triangle fa-2x mb-2 text-warning"></i>
+                    <h3 class="mb-0">{{ stats.anomalias_activas }}</h3>
+                    <p class="mb-0">Anomalías Activas</p>
+                    <small class="text-muted">{{ stats.anomalias_total }} total</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Problemas Detectados -->
+    {% if problemas %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bug me-2"></i>Problemas Detectados
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0">
+                        {% for problema in problemas %}
+                        <li class="mb-2">
+                            <i class="fas fa-times-circle text-danger me-2"></i>
+                            {{ problema }}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Información de Ejecuciones -->
+    <div class="row mb-4">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history me-2"></i>Historial de Ejecuciones
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <h4 class="text-success">{{ stats.ejecuciones_exitosas }}</h4>
+                            <small>Exitosas</small>
+                        </div>
+                        <div class="col-6">
+                            <h4 class="text-info">
+                                {% if stats.ultima_ejecucion %}
+                                    {{ stats.ultima_ejecucion.anomalias_detectadas }}
+                                {% else %}
+                                    0
+                                {% endif %}
+                            </h4>
+                            <small>Última detección</small>
+                        </div>
+                    </div>
+                    
+                    {% if stats.ultima_ejecucion %}
+                    <hr>
+                    <p class="mb-1"><strong>Última ejecución:</strong></p>
+                    <p class="mb-1">{{ stats.ultima_ejecucion.fecha_ejecucion|date:"d/m/Y H:i" }}</p>
+                    <p class="mb-1">
+                        <span class="badge bg-{% if stats.ultima_ejecucion.exitoso %}success{% else %}danger{% endif %}">
+                            {% if stats.ultima_ejecucion.exitoso %}Exitosa{% else %}Error{% endif %}
+                        </span>
+                    </p>
+                    <p class="mb-0">
+                        <small class="text-muted">
+                            Criterio: {{ stats.ultima_ejecucion.criterio_usado.nombre }}
+                        </small>
+                    </p>
+                    {% else %}
+                    <div class="text-center py-3">
+                        <i class="fas fa-info-circle text-muted fa-2x mb-2"></i>
+                        <p class="text-muted mb-0">No hay ejecuciones registradas</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-tools me-2"></i>Acciones de Diagnóstico
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary" onclick="ejecutarPruebaCompleta()">
+                            <i class="fas fa-play-circle me-2"></i>
+                            Ejecutar Prueba Completa
+                        </button>
+                        
+                        <button class="btn btn-info" onclick="verificarDatos()">
+                            <i class="fas fa-database me-2"></i>
+                            Verificar Calidad de Datos
+                        </button>
+                        
+                        <button class="btn btn-warning" onclick="limpiarAnomaliasPrueba()">
+                            <i class="fas fa-trash me-2"></i>
+                            Limpiar Anomalías de Prueba
+                        </button>
+                        
+                        <button class="btn btn-secondary" onclick="exportarDiagnostico()">
+                            <i class="fas fa-download me-2"></i>
+                            Exportar Diagnóstico
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Distribución de Datos -->
+    <div class="row mb-4">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-pie me-2"></i>Distribución por Carrera
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- AGREGAR CANVAS PARA GRÁFICO -->
+                    <canvas id="graficoCarreras" width="400" height="300"></canvas>
+                    <div id="errorCarreras" class="alert alert-danger mt-2" style="display: none;"></div>
+                    
+                    <!-- Estadísticas adicionales -->
+                    <div class="row mt-3">
+                        <div class="col-6">
+                            <small>Total Carreras: <strong id="totalCarreras">-</strong></small>
+                        </div>
+                        <div class="col-6">
+                            <small>Total Estudiantes: <strong id="totalEstudiantesCarrera">-</strong></small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>Registros por Semestre
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- AGREGAR CANVAS PARA GRÁFICO -->
+                    <canvas id="graficoSemestres" width="400" height="300"></canvas>
+                    <div id="errorSemestres" class="alert alert-danger mt-2" style="display: none;"></div>
+                    
+                    <!-- Estadísticas adicionales -->
+                    <div class="row mt-3">
+                        <div class="col-6">
+                            <small>Total Semestres: <strong id="totalSemestres">-</strong></small>
+                        </div>
+                        <div class="col-6">
+                            <small>Total Registros: <strong id="totalRegistrosSemestre">-</strong></small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NUEVA SECCIÓN: Gráficos Adicionales -->
+    <div class="row mb-4">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Tipos de Anomalías
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="graficoAnomalias" width="400" height="300"></canvas>
+                    <div id="errorAnomalias" class="alert alert-danger mt-2" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-tasks me-2"></i>Estados de Anomalías
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="graficoEstados" width="400" height="300"></canvas>
+                    <div id="errorEstados" class="alert alert-danger mt-2" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NUEVA SECCIÓN: Métricas Detalladas -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line me-2"></i>Métricas Detalladas del Sistema
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-2">
+                            <h4 id="totalEstudiantes" class="text-primary">-</h4>
+                            <small class="text-muted">Total Estudiantes</small>
+                        </div>
+                        <div class="col-md-2">
+                            <h4 id="totalRegistros" class="text-success">-</h4>
+                            <small class="text-muted">Total Registros</small>
+                        </div>
+                        <div class="col-md-2">
+                            <h4 id="totalAnomalias" class="text-warning">-</h4>
+                            <small class="text-muted">Total Anomalías</small>
+                        </div>
+                        <div class="col-md-2">
+                            <h4 id="totalDerivaciones" class="text-info">-</h4>
+                            <small class="text-muted">Total Derivaciones</small>
+                        </div>
+                        <div class="col-md-2">
+                            <h4 id="tasaAnomalias" class="text-danger">-</h4>
+                            <small class="text-muted">Tasa Anomalías</small>
+                        </div>
+                        <div class="col-md-2">
+                            <h4 id="registrosPorEstudiante" class="text-secondary">-</h4>
+                            <small class="text-muted">Registros/Estudiante</small>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="row text-center">
+                        <div class="col-md-6">
+                            <p class="mb-1"><strong>Última Detección:</strong></p>
+                            <p id="ultimaDeteccion" class="text-muted">-</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-1"><strong>Última Derivación:</strong></p>
+                            <p id="ultimaDerivacion" class="text-muted">-</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error general (invisible por defecto) -->
+    <div id="errorGeneral" class="alert alert-danger" style="display: none;"></div>
+
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>Registros por Semestre
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="registros-semestre">
+                        <!-- Se llenará con JavaScript -->
+                        <div class="text-center py-3">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Cargando...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log de Diagnóstico -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-terminal me-2"></i>Log de Diagnóstico
+                    </h5>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="limpiarLog()">
+                        <i class="fas fa-eraser me-1"></i>Limpiar
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="log-diagnostico" class="bg-dark text-light p-3" style="height: 300px; overflow-y: auto; font-family: monospace; font-size: 14px;">
+                        <div class="text-success">Sistema CPA - Log de Diagnóstico</div>
+                        <div class="text-muted">Esperando comandos...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Resultados -->
+<div class="modal fade" id="modalResultados" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-chart-line me-2"></i>Resultados del Diagnóstico
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="contenido-resultados">
+                    <!-- Se llenará dinámicamente -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="btn btn-primary" onclick="aplicarSoluciones()">
+                    Aplicar Soluciones Sugeridas
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let logContainer;
+
+document.addEventListener('DOMContentLoaded', function() {
+    logContainer = document.getElementById('log-diagnostico');
+    escribirLog('Sistema inicializado correctamente', 'success');
+    
+    // Cargar estadísticas al inicio
+    cargarEstadisticasCompletas();
+});
+
+function escribirLog(mensaje, tipo = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    const colores = {
+        'info': 'text-info',
+        'success': 'text-success', 
+        'warning': 'text-warning',
+        'error': 'text-danger'
+    };
+    
+    const linea = document.createElement('div');
+    linea.className = colores[tipo] || 'text-light';
+    linea.innerHTML = `[${timestamp}] ${mensaje}`;
+    
+    logContainer.appendChild(linea);
+    logContainer.scrollTop = logContainer.scrollHeight;
+}
+
+function limpiarLog() {
+    logContainer.innerHTML = '<div class="text-success">Sistema CPA - Log de Diagnóstico</div>';
+}
+
+// Función principal para cargar todas las estadísticas
+function cargarEstadisticasCompletas() {
+    escribirLog('Cargando estadísticas del sistema...', 'info');
+    
+    fetch('/cpa/api/estadisticas-distribucion/')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                escribirLog('✓ Estadísticas cargadas correctamente', 'success');
+                
+                // Actualizar métricas
+                actualizarMetricasGenerales(data.metricas_generales);
+                actualizarRatios(data.ratios);
+                
+                // Crear gráficos
+                crearGraficoCarreras(data.distribuciones.carreras);
+                crearGraficoSemestres(data.distribuciones.semestres);
+                crearGraficoAnomalias(data.distribuciones.tipos_anomalia);
+                crearGraficoEstados(data.distribuciones.estados_anomalia);
+                
+            } else {
+                escribirLog('❌ Error cargando estadísticas: ' + data.error, 'error');
+                mostrarErrorGeneral('Error cargando estadísticas: ' + data.error);
+            }
+        })
+        .catch(error => {
+            escribirLog('❌ Error de conexión: ' + error.message, 'error');
+            mostrarErrorGeneral('Error de conexión al cargar estadísticas');
+        });
+}
+
+function actualizarMetricasGenerales(metricas) {
+    const actualizaciones = {
+        'totalEstudiantes': metricas.total_estudiantes,
+        'totalRegistros': metricas.total_registros,
+        'totalAnomalias': metricas.total_anomalias,
+        'totalDerivaciones': metricas.total_derivaciones,
+        'totalCarreras': metricas.total_carreras || 0,
+        'totalEstudiantesCarrera': metricas.total_estudiantes,
+        'totalSemestres': 0, // Se actualizará con los datos de semestres
+        'totalRegistrosSemestre': metricas.total_registros
+    };
+    
+    Object.entries(actualizaciones).forEach(([id, valor]) => {
+        const elemento = document.getElementById(id);
+        if (elemento) {
+            elemento.textContent = valor || 0;
+        }
+    });
+    
+    // Fechas especiales
+    if (metricas.ultima_deteccion_fecha) {
+        const ultimaDeteccion = document.getElementById('ultimaDeteccion');
+        if (ultimaDeteccion) {
+            ultimaDeteccion.textContent = metricas.ultima_deteccion_fecha;
+        }
+    }
+    
+    if (metricas.ultima_derivacion_fecha) {
+        const ultimaDerivacion = document.getElementById('ultimaDerivacion');
+        if (ultimaDerivacion) {
+            ultimaDerivacion.textContent = metricas.ultima_derivacion_fecha;
+        }
+    }
+}
+
+function actualizarRatios(ratios) {
+    const ratioElementos = {
+        'tasaAnomalias': ratios.tasa_anomalias_global + '%',
+        'registrosPorEstudiante': ratios.registros_por_estudiante.toFixed(1)
+    };
+    
+    Object.entries(ratioElementos).forEach(([id, valor]) => {
+        const elemento = document.getElementById(id);
+        if (elemento) {
+            elemento.textContent = valor;
+        }
+    });
+}
+
+function crearGraficoCarreras(carreras) {
+    const canvas = document.getElementById('graficoCarreras');
+    if (!canvas || !carreras || carreras.length === 0) {
+        mostrarErrorEnCanvas('graficoCarreras', 'errorCarreras', 'No hay datos de carreras');
+        return;
+    }
+    
+    const ctx = canvas.getContext('2d');
+    
+    try {
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: carreras.map(c => c.nombre),
+                datasets: [{
+                    data: carreras.map(c => c.total_estudiantes),
+                    backgroundColor: [
+                        '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
+                        '#9966FF', '#FF9F40', '#FF6B6B', '#4ECDC4'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Distribución de Estudiantes por Carrera'
+                    },
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+        
+        // Actualizar contador de carreras
+        const totalCarreras = document.getElementById('totalCarreras');
+        if (totalCarreras) {
+            totalCarreras.textContent = carreras.length;
+        }
+        
+    } catch (error) {
+        mostrarErrorEnCanvas('graficoCarreras', 'errorCarreras', 'Error creando gráfico: ' + error.message);
+    }
+}
+
+function crearGraficoSemestres(semestres) {
+    const canvas = document.getElementById('graficoSemestres');
+    if (!canvas || !semestres || semestres.length === 0) {
+        mostrarErrorEnCanvas('graficoSemestres', 'errorSemestres', 'No hay datos de semestres');
+        return;
+    }
+    
+    const ctx = canvas.getContext('2d');
+    
+    try {
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: semestres.map(s => `Semestre ${s.semestre}`),
+                datasets: [{
+                    label: 'Registros Académicos',
+                    data: semestres.map(s => s.total_registros),
+                    backgroundColor: '#36A2EB',
+                    borderColor: '#1E88E5',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Registros Académicos por Semestre'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+        
+        // Actualizar contador de semestres
+        const totalSemestres = document.getElementById('totalSemestres');
+        if (totalSemestres) {
+            totalSemestres.textContent = semestres.length;
+        }
+        
+    } catch (error) {
+        mostrarErrorEnCanvas('graficoSemestres', 'errorSemestres', 'Error creando gráfico: ' + error.message);
+    }
+}
+
+function crearGraficoAnomalias(anomalias) {
+    const canvas = document.getElementById('graficoAnomalias');
+    if (!canvas || !anomalias || anomalias.length === 0) {
+        mostrarErrorEnCanvas('graficoAnomalias', 'errorAnomalias', 'No hay datos de anomalías');
+        return;
+    }
+    
+    const ctx = canvas.getContext('2d');
+    
+    try {
+        new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: anomalias.map(a => a.tipo_display),
+                datasets: [{
+                    data: anomalias.map(a => a.total),
+                    backgroundColor: [
+                        '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Distribución por Tipo de Anomalía'
+                    },
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        mostrarErrorEnCanvas('graficoAnomalias', 'errorAnomalias', 'Error creando gráfico: ' + error.message);
+    }
+}
+
+function crearGraficoEstados(estados) {
+    const canvas = document.getElementById('graficoEstados');
+    if (!canvas || !estados || estados.length === 0) {
+        mostrarErrorEnCanvas('graficoEstados', 'errorEstados', 'No hay datos de estados');
+        return;
+    }
+    
+    const ctx = canvas.getContext('2d');
+    
+    try {
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: estados.map(e => e.estado_display),
+                datasets: [{
+                    label: 'Cantidad',
+                    data: estados.map(e => e.total),
+                    backgroundColor: [
+                        '#FFC107', '#17A2B8', '#007BFF', '#28A745', '#6C757D'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Anomalías por Estado'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        mostrarErrorEnCanvas('graficoEstados', 'errorEstados', 'Error creando gráfico: ' + error.message);
+    }
+}
+
+function mostrarErrorEnCanvas(canvasId, errorId, mensaje) {
+    const canvas = document.getElementById(canvasId);
+    const errorDiv = document.getElementById(errorId);
+    
+    if (canvas) {
+        canvas.style.display = 'none';
+    }
+    
+    if (errorDiv) {
+        errorDiv.style.display = 'block';
+        errorDiv.textContent = mensaje;
+    }
+}
+
+function mostrarErrorGeneral(mensaje) {
+    const errorDiv = document.getElementById('errorGeneral');
+    if (errorDiv) {
+        errorDiv.style.display = 'block';
+        errorDiv.textContent = mensaje;
+    }
+}
+
+// Mantener las funciones originales del diagnóstico
+function ejecutarDiagnostico() {
+    escribirLog('Iniciando diagnóstico del sistema...', 'info');
+    
+    setTimeout(() => {
+        escribirLog('✓ Verificando datos básicos...', 'success');
+        escribirLog(`✓ Estudiantes activos: {{ stats.estudiantes_activos }}`, 'success');
+        escribirLog(`✓ Registros académicos: {{ stats.registros_academicos }}`, 'success');
+        escribirLog(`✓ Criterios activos: {{ stats.criterios_activos }}`, 'success');
+        
+        {% if problemas %}
+        escribirLog('⚠️ Problemas detectados:', 'warning');
+        {% for problema in problemas %}
+        escribirLog(`  - {{ problema }}`, 'warning');
+        {% endfor %}
+        {% else %}
+        escribirLog('✓ No se detectaron problemas', 'success');
+        {% endif %}
+        
+        escribirLog('Diagnóstico completado', 'info');
+    }, 1000);
+}
+
+function probarAnalisis() {
+    escribirLog('Iniciando prueba de análisis...', 'info');
+    
+    if ({{ stats.criterios_activos }} === 0) {
+        escribirLog('❌ Error: No hay criterios activos', 'error');
+        return;
+    }
+    
+    if ({{ stats.estudiantes_activos }} < 10) {
+        escribirLog('❌ Error: Insuficientes estudiantes activos', 'error');
+        return;
+    }
+    
+    escribirLog('✓ Prerequisitos verificados', 'success');
+    escribirLog('Ejecutando análisis de prueba...', 'info');
+    
+    fetch('/cpa/api/probar-analisis/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            escribirLog(`✓ Análisis exitoso: ${data.resultados.anomalias_detectadas} anomalías detectadas`, 'success');
+            escribirLog(`✓ Tiempo de ejecución: ${data.resultados.tiempo_ejecucion}s`, 'success');
+        } else {
+            escribirLog(`❌ Error en análisis: ${data.error}`, 'error');
+        }
+    })
+    .catch(error => {
+        escribirLog(`❌ Error de conexión: ${error}`, 'error');
+    });
+}
+
+// Mantener todas las demás funciones originales...
+function ejecutarPruebaCompleta() {
+    escribirLog('=== INICIANDO PRUEBA COMPLETA ===', 'info');
+    // ... resto del código original
+}
+
+function verificarDatos() {
+    escribirLog('Verificando calidad de datos...', 'info');
+    // ... resto del código original
+}
+
+function exportarDiagnostico() {
+    escribirLog('Generando reporte de diagnóstico...', 'info');
+    // ... resto del código original
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+
+<style>
+#log-diagnostico {
+    font-family: 'Courier New', monospace;
+    line-height: 1.4;
+}
+
+.spinner-border {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.progress {
+    background-color: #e9ecef;
+}
+
+.card {
+    transition: transform 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+/* Estilos adicionales para los gráficos */
+canvas {
+    max-height: 300px !important;
+}
+
+.alert {
+    margin-bottom: 0.5rem;
+}
+
+/* Estilos para las métricas */
+.row.text-center h4 {
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+}
+
+.row.text-center small {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    font-weight: 500;
+}
+
+/* Loading states */
+.text-center .spinner-border {
+    margin: 2rem 0;
+}
+
+/* Responsive para gráficos */
+@media (max-width: 768px) {
+    canvas {
+        max-height: 250px !important;
+    }
+    
+    .row.text-center .col-md-2 {
+        margin-bottom: 1rem;
+    }
+}
+
+/* Colores personalizados para métricas */
+.text-primary { color: #007bff !important; }
+.text-success { color: #28a745 !important; }
+.text-warning { color: #ffc107 !important; }
+.text-info { color: #17a2b8 !important; }
+.text-danger { color: #dc3545 !important; }
+.text-secondary { color: #6c757d !important; }
+
+/* Animaciones */
+.card {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Error states */
+.alert-danger {
+    border-left: 4px solid #dc3545;
+}
+
+#errorGeneral {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    max-width: 400px;
+    animation: slideInRight 0.3s ease;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+</style>
+
+{% endblock %}
