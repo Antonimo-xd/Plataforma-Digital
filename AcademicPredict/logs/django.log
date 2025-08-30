@@ -3208,3 +3208,9 @@ Traceback (most recent call last):
     ...<3 lines>...
     )
 django.contrib.sessions.exceptions.SessionInterrupted: The request's session was deleted before the request completed. The user may have logged out in a concurrent request, for example.
+Watching for file changes with StatReloader
+C:\Users\anton\Documents\GitHub\Plataforma-Digital\AcademicPredict\AcademicPredict\settings.py changed, reloading.
+Watching for file changes with StatReloader
+Not Found: /favicon.ico
+C:\Users\anton\Documents\GitHub\Plataforma-Digital\AcademicPredict\prototipo\views.py changed, reloading.
+Watching for file changes with StatReloader

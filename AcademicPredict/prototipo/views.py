@@ -11,7 +11,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.mail import send_mail
 from django.conf import settings
 from django.db import transaction
-from django.urls import reverse  # ← AGREGAR ESTE
+from django.urls import reverse  
 import json
 import pandas as pd
 import numpy as np
@@ -1491,7 +1491,6 @@ def procesar_archivo_estudiantes_web(archivo):
     
     return resultado
 
-
 def procesar_archivo_asignaturas_web(archivo):
     """
     📚 Procesa archivo de asignaturas desde la interfaz web - CORREGIDO
@@ -1591,7 +1590,6 @@ def procesar_archivo_asignaturas_web(archivo):
         resultado['errores'].append(f'Error general: {str(e)}')
     
     return resultado
-
 
 def procesar_archivo_registros_web(archivo):
     """
@@ -3799,53 +3797,6 @@ def api_tipos_anomalias(request):
         }, status=500)
 
 @login_required
-def debug_models_info(request):
-    """
-    🔍 Función de debug para inspeccionar modelos (solo para desarrollo)
-    """
-    try:
-        info = {
-            'estudiante_fields': [f.name for f in Estudiante._meta.get_fields()],
-            'deteccion_anomalia_fields': [f.name for f in DeteccionAnomalia._meta.get_fields()],
-            'registro_academico_fields': [f.name for f in RegistroAcademico._meta.get_fields()],
-            'derivacion_fields': [f.name for f in Derivacion._meta.get_fields()],
-            'total_estudiantes': Estudiante.objects.count(),
-            'total_anomalias': DeteccionAnomalia.objects.count(),
-            'ejemplo_estudiante': None,
-            'ejemplo_anomalia': None
-        }
-        
-        # Agregar ejemplos si existen registros
-        estudiante_ejemplo = Estudiante.objects.first()
-        if estudiante_ejemplo:
-            info['ejemplo_estudiante'] = {
-                'id_estudiante': estudiante_ejemplo.id_estudiante,
-                'nombre': estudiante_ejemplo.nombre,
-                'carrera': str(estudiante_ejemplo.carrera) if estudiante_ejemplo.carrera else None
-            }
-        
-        anomalia_ejemplo = DeteccionAnomalia.objects.first()
-        if anomalia_ejemplo:
-            info['ejemplo_anomalia'] = {
-                'id': anomalia_ejemplo.id,
-                'tipo_anomalia': anomalia_ejemplo.tipo_anomalia,
-                'estado': anomalia_ejemplo.estado,
-                'fecha_deteccion': anomalia_ejemplo.fecha_deteccion.isoformat()
-            }
-        
-        return JsonResponse({
-            'success': True,
-            'debug_info': info,
-            'timestamp': timezone.now().isoformat()
-        })
-        
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
-
-@login_required
 @user_passes_test(lambda u: u.rol in ['analista_cpa', 'coordinador_cpa', 'coordinador_carrera'])
 def exportar_todas_anomalias(request):
     """
@@ -4170,48 +4121,10 @@ def verificar_campo_ingreso():
             
     except Exception as e:
         print(f"❌ Error: {str(e)}")
-# 🔧 Para usar la verificación, agregar esta línea temporalmente en views.py:
-# verificar_campo_ingreso()  # ← Agregar esta línea al inicio de exportar_reporte_anomalias
+
 
 @login_required
 def ayuda_documentacion(request):
     """Vista para mostrar ayuda y documentación"""
     return render(request, 'anomalias/ayuda_documentacion.html')
 
-# 🔧 FUNCIÓN ADICIONAL: Verificar todos los campos de Estudiante
-def debug_campos_estudiante():
-    """
-    🔍 Función para verificar los campos reales del modelo Estudiante
-    Solo para debugging - eliminar en producción
-    """
-    try:
-        from django.apps import apps
-        
-        # Obtener el modelo Estudiante
-        modelo_estudiante = apps.get_model('prototipo', 'Estudiante')
-        
-        print("🔍 DEBUG - Campos del modelo Estudiante:")
-        for field in modelo_estudiante._meta.get_fields():
-            print(f"   - {field.name}: {type(field).__name__}")
-        
-        # Verificar un estudiante real
-        estudiante_ejemplo = modelo_estudiante.objects.first()
-        if estudiante_ejemplo:
-            print(f"\n📝 Ejemplo de estudiante:")
-            print(f"   ID: {estudiante_ejemplo.pk}")
-            print(f"   ID Estudiante: {estudiante_ejemplo.id_estudiante}")
-            print(f"   Nombre: {estudiante_ejemplo.nombre}")
-            
-            # Verificar campo de año de ingreso
-            if hasattr(estudiante_ejemplo, 'ingreso_año'):
-                print(f"   Ingreso Año (con ñ): {estudiante_ejemplo.ingreso_año}")
-            else:
-                print(f"   ❌ NO tiene campo 'ingreso_año'")
-                
-            if hasattr(estudiante_ejemplo, 'ingreso_ano'):
-                print(f"   Ingreso Ano (sin ñ): {estudiante_ejemplo.ingreso_ano}")
-            else:
-                print(f"   ❌ NO tiene campo 'ingreso_ano'")
-        
-    except Exception as e:
-        print(f"❌ Error en debug: {str(e)}")
