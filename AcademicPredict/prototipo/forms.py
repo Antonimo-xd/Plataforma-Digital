@@ -182,33 +182,6 @@ class ActualizarEstadoAnomaliaForm(forms.Form):
         })
     )
 
-class InstanciaApoyoForm(forms.ModelForm):
-    class Meta:
-        model = InstanciaApoyo
-        fields = ['nombre', 'tipo', 'contacto', 'email', 'telefono', 'descripcion']
-        widgets = {
-            'nombre': forms.TextInput(attrs={'class': 'form-control'}),
-            'tipo': forms.Select(attrs={'class': 'form-control'}),
-            'contacto': forms.TextInput(attrs={'class': 'form-control'}),
-            'email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'telefono': forms.TextInput(attrs={'class': 'form-control'}),
-            'descripcion': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
-        }
-
-class CarreraForm(forms.ModelForm):
-    class Meta:
-        model = Carrera
-        fields = ['nombre', 'codigo', 'coordinador']
-        widgets = {
-            'nombre': forms.TextInput(attrs={'class': 'form-control'}),
-            'codigo': forms.TextInput(attrs={'class': 'form-control'}),
-            'coordinador': forms.Select(attrs={'class': 'form-control'}),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['coordinador'].queryset = Usuario.objects.filter(rol='coordinador_carrera')
-
 class EstudianteForm(forms.ModelForm):
     class Meta:
         model = Estudiante
@@ -306,7 +279,6 @@ class ImportarDatosForm(forms.Form):
         
         return cleaned_data
 
-
 class FiltroReporteForm(forms.Form):
     fecha_inicio = forms.DateField(
         required=False,
@@ -331,123 +303,6 @@ class FiltroReporteForm(forms.Form):
         choices=[('', 'Todos los tipos')] + DeteccionAnomalia.TIPOS_ANOMALIA,
         required=False,
         widget=forms.Select(attrs={'class': 'form-control'})
-    )
-
-class ConfiguracionAlertasForm(forms.Form):
-    alertas_criticas = forms.BooleanField(
-        required=False,
-        initial=True,
-        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
-    )
-    alertas_nuevas_anomalias = forms.BooleanField(
-        required=False,
-        initial=True,
-        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
-    )
-    alertas_asignaturas_criticas = forms.BooleanField(
-        required=False,
-        initial=True,
-        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
-    )
-    alertas_seguimiento_vencido = forms.BooleanField(
-        required=False,
-        initial=True,
-        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
-    )
-    
-    umbral_critico_porcentaje = forms.FloatField(
-        initial=20.0,
-        min_value=5.0,
-        max_value=50.0,
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'step': '0.1'
-        }),
-        help_text='Porcentaje de anomalías en asignatura para considerarla crítica'
-    )
-
-class BusquedaAvanzadaForm(forms.Form):
-    termino_busqueda = forms.CharField(
-        max_length=200,
-        required=False,
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Buscar estudiantes, asignaturas...'
-        })
-    )
-    
-    campo_busqueda = forms.ChoiceField(
-        choices=[
-            ('todos', 'Todos los campos'),
-            ('nombre_estudiante', 'Nombre del estudiante'),
-            ('id_estudiante', 'ID del estudiante'),
-            ('nombre_asignatura', 'Nombre de asignatura'),
-            ('carrera', 'Carrera'),
-        ],
-        required=False,
-        widget=forms.Select(attrs={'class': 'form-control'})
-    )
-    
-    rango_score_min = forms.FloatField(
-        required=False,
-        min_value=-1.0,
-        max_value=1.0,
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'step': '0.01',
-            'placeholder': 'Score mínimo'
-        })
-    )
-    
-    rango_score_max = forms.FloatField(
-        required=False,
-        min_value=-1.0,
-        max_value=1.0,
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'step': '0.01',
-            'placeholder': 'Score máximo'
-        })
-    )
-    
-    promedio_min = forms.FloatField(
-        required=False,
-        min_value=1.0,
-        max_value=7.0,
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'step': '0.1',
-            'placeholder': 'Promedio mínimo'
-        })
-    )
-    
-    promedio_max = forms.FloatField(
-        required=False,
-        min_value=1.0,
-        max_value=7.0,
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'step': '0.1',
-            'placeholder': 'Promedio máximo'
-        })
-    )
-    
-    asistencia_min = forms.FloatField(
-        required=False,
-        min_value=0,
-        max_value=100,
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'step': '0.1',
-            'placeholder': 'Asistencia mínima %'
-        })
-    )
-    
-    incluir_resueltos = forms.BooleanField(
-        required=False,
-        initial=False,
-        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-        label='Incluir anomalías resueltas'
     )
 
 class ActualizacionMasivaForm(forms.Form):

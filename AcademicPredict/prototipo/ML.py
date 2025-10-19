@@ -23,10 +23,6 @@ def ejecutar_deteccion_anomalias(criterio, usuario_ejecutor):
     try:
         print(f"🔍 Iniciando detección con criterio: {criterio.nombre}")
         
-        # Debug del modelo (solo en desarrollo)
-        if hasattr(criterio, 'debug') and criterio.debug:
-            debug_modelo_estudiante()
-        
         # 1. Preparar datos mejorados
         datos_estudiantes = preparar_datos_estudiantes_mejorado(criterio)
         
@@ -389,194 +385,58 @@ def determinar_tipo_anomalia(estudiante_data):
 
 def guardar_anomalias_detectadas(resultados_modelo, criterio, usuario_ejecutor):
     """
-    💾 FUNCIÓN CORREGIDA: Guarda las anomalías en la base de datos
+    Guarda las anomalías detectadas en la base de datos
     """
+    from .utils.helpers import determinar_nivel_criticidad, crear_alertas_automaticas
+    
     anomalias_guardadas = []
     
-    print(f"💾 Guardando {len(resultados_modelo['anomalias'])} anomalías...")
-    
-    for anomalia_data in resultados_modelo['anomalias']:
+    for estudiante_data in resultados_modelo['anomalias']:
         try:
-            estudiante = anomalia_data['estudiante']
-            
-            # 🔧 VERIFICACIÓN: Asegurar que el estudiante existe
-            if not estudiante or not hasattr(estudiante, 'pk'):
-                print(f"⚠️ Estudiante inválido en anomalía, saltando...")
-                continue
-            
-            # Verificar si ya existe anomalía reciente para este estudiante
-            anomalia_existente = DeteccionAnomalia.objects.filter(
-                estudiante=estudiante,
-                tipo_anomalia=anomalia_data['tipo_anomalia'],
-                fecha_deteccion__gte=timezone.now() - timedelta(days=7)
-            ).first()
-            
-            if anomalia_existente:
-                print(f"⚠️ Anomalía reciente ya existe para {estudiante.nombre}")
-                continue
-            
-            # Calcular prioridad basada en score
-            score = anomalia_data['score_anomalia']
-            if score >= 80:
-                prioridad = 5  # Crítica
-            elif score >= 60:
-                prioridad = 4  # Alta
-            elif score >= 40:
-                prioridad = 3  # Media
-            elif score >= 20:
-                prioridad = 2  # Baja
-            else:
-                prioridad = 1  # Muy baja
-            
-            # Crear nueva anomalía
-            nueva_anomalia = DeteccionAnomalia.objects.create(
-                estudiante=estudiante,
-                criterio_usado=criterio,
-                tipo_anomalia=anomalia_data['tipo_anomalia'],
-                score_anomalia=anomalia_data['score_anomalia'],
-                confianza=anomalia_data['confianza'],
-                promedio_general=anomalia_data['promedio_general'],
-                asistencia_promedio=anomalia_data['asistencia_promedio'],
-                uso_plataforma_promedio=anomalia_data['uso_plataforma_promedio'],
-                variacion_notas=anomalia_data['variacion_notas'],
-                prioridad=prioridad,
-                estado='detectado'
+            estudiante = Estudiante.objects.get(
+                id_estudiante=estudiante_data['id_estudiante']
             )
             
-            anomalias_guardadas.append(nueva_anomalia)
-            print(f"✅ Anomalía guardada: {nueva_anomalia.estudiante.nombre} - {nueva_anomalia.tipo_anomalia}")
+            # ✅ Obtener nivel de criticidad (retorna texto)
+            nivel_criticidad = determinar_nivel_criticidad(
+                estudiante, 
+                estudiante_data
+            )
             
+            # Determinar prioridad numérica basada en criticidad
+            if nivel_criticidad == 'alta':
+                prioridad = 5
+            elif nivel_criticidad == 'media':
+                prioridad = 3
+            else:  # baja
+                prioridad = 1
+            
+            # Crear detección
+            deteccion = DeteccionAnomalia.objects.create(
+                estudiante=estudiante,
+                criterio_usado=criterio,
+                tipo_anomalia=estudiante_data['tipo_anomalia'],
+                score_anomalia=estudiante_data['anomaly_score'],
+                confianza=estudiante_data['confianza'],
+                promedio_general=estudiante_data['promedio_general'],
+                asistencia_promedio=estudiante_data['asistencia_promedio'],
+                uso_plataforma_promedio=estudiante_data['uso_plataforma_promedio'],
+                variacion_notas=estudiante_data['variacion_notas'],
+                prioridad=prioridad,
+                nivel_criticidad=nivel_criticidad,  # ✅ Agregar este campo
+            )
+            
+            # Crear alertas si es crítica
+            if nivel_criticidad == 'alta':
+                crear_alertas_automaticas(deteccion)
+            
+            anomalias_guardadas.append(deteccion)
+            
+        except Estudiante.DoesNotExist:
+            logger.warning(f"Estudiante {estudiante_data['id_estudiante']} no encontrado")
+            continue
         except Exception as e:
-            print(f"❌ Error guardando anomalía: {str(e)}")
+            logger.error(f"Error guardando anomalía: {str(e)}")
             continue
     
-    print(f"💾 Total anomalías guardadas: {len(anomalias_guardadas)}")
     return anomalias_guardadas
-
-def generar_reporte_anomalias(request, anomalia_ids=None):
-    """
-    🔧 FUNCIÓN CORREGIDA: Generar reporte de anomalías
-    Corrige el error: 'Estudiante' object has no attribute 'ingreso_ano'
-    """
-    try:
-        print(f"📊 Generando reporte de anomalías...")
-        
-        # Obtener anomalías
-        if anomalia_ids:
-            anomalias = DeteccionAnomalia.objects.filter(id__in=anomalia_ids)
-        else:
-            anomalias = DeteccionAnomalia.objects.all()
-        
-        # Filtrar por permisos del usuario
-        if request.user.rol == 'coordinador_carrera':
-            try:
-                carrera = Carrera.objects.get(coordinador=request.user)
-                anomalias = anomalias.filter(estudiante__carrera=carrera)
-            except Carrera.DoesNotExist:
-                raise Exception("Usuario sin carrera asignada")
-        
-        anomalias = anomalias.select_related(
-            'estudiante', 'estudiante__carrera', 'criterio_usado'
-        ).order_by('-fecha_deteccion')
-        
-        if not anomalias.exists():
-            raise Exception("No hay anomalías para exportar")
-        
-        print(f"📋 Exportando {anomalias.count()} anomalías...")
-        
-        # Crear respuesta CSV
-        response = HttpResponse(content_type='text/csv; charset=utf-8')
-        response['Content-Disposition'] = f'attachment; filename="anomalias_{timezone.now().strftime("%Y%m%d_%H%M")}.csv"'
-        
-        # Escribir BOM para Excel
-        response.write('\ufeff')
-        
-        import csv
-        writer = csv.writer(response)
-        
-        # Escribir cabeceras
-        writer.writerow([
-            'ID Anomalía',
-            'Estudiante ID',
-            'Nombre Estudiante', 
-            'Carrera',
-            'Año Ingreso',  # ← CORREGIDO: nombre del campo
-            'Tipo Anomalía',
-            'Estado',
-            'Prioridad',
-            'Score',
-            'Confianza',
-            'Fecha Detección',
-            'Criterio Usado',
-            'Descripción'
-        ])
-        
-        # Escribir datos
-        for anomalia in anomalias:
-            try:
-                # CORREGIDO: usar ingreso_año en lugar de ingreso_ano
-                año_ingreso = getattr(anomalia.estudiante, 'ingreso_año', 'N/A')
-                
-                writer.writerow([
-                    anomalia.id,
-                    anomalia.estudiante.id_estudiante,
-                    anomalia.estudiante.nombre,
-                    anomalia.estudiante.carrera.nombre if anomalia.estudiante.carrera else 'Sin carrera',
-                    año_ingreso,  # ← CORREGIDO
-                    anomalia.get_tipo_anomalia_display(),
-                    anomalia.get_estado_display(),
-                    anomalia.prioridad,
-                    anomalia.score_anomalia,
-                    anomalia.confianza,
-                    anomalia.fecha_deteccion.strftime('%Y-%m-%d %H:%M:%S'),
-                    anomalia.criterio_usado.nombre if anomalia.criterio_usado else 'N/A',
-                    anomalia.descripcion or 'Sin descripción'
-                ])
-            except Exception as e:
-                print(f"⚠️ Error procesando anomalía {anomalia.id}: {str(e)}")
-                continue
-        
-        print(f"✅ Reporte generado exitosamente")
-        return response
-        
-    except Exception as e:
-        print(f"❌ Error generando reporte: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        
-        messages.error(request, f'Error generando reporte: {str(e)}')
-        return redirect('listado_anomalias')
-
-# 🔧 FUNCIÓN DE DEBUGGING ADICIONAL
-def debug_modelo_estudiante():
-    """
-    🔍 Función para debuggear el modelo Estudiante
-    Solo para desarrollo - eliminar en producción
-    """
-    try:
-        # Verificar primer estudiante
-        primer_estudiante = Estudiante.objects.first()
-        
-        if primer_estudiante:
-            print(f"🔍 DEBUG - Modelo Estudiante:")
-            print(f"   Tipo de objeto: {type(primer_estudiante)}")
-            print(f"   Atributos disponibles: {dir(primer_estudiante)}")
-            print(f"   PK: {primer_estudiante.pk}")
-            print(f"   ID Estudiante: {primer_estudiante.id_estudiante}")
-            print(f"   Nombre: {primer_estudiante.nombre}")
-            
-            # Verificar si tiene atributo 'id'
-            tiene_id = hasattr(primer_estudiante, 'id')
-            print(f"   ¿Tiene atributo 'id'?: {tiene_id}")
-            
-            if tiene_id:
-                print(f"   Valor de 'id': {primer_estudiante.id}")
-            else:
-                print(f"   ❌ NO tiene atributo 'id' - usar 'pk' o 'id_estudiante'")
-                
-        else:
-            print("❌ No hay estudiantes en la base de datos")
-            
-    except Exception as e:
-        print(f"❌ Error en debug: {str(e)}")
-

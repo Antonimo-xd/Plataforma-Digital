@@ -1,5 +1,5 @@
 {% extends 'anomalias/base.html' %}
-{% load url_helpers %}
+{% load filters %}
 
 {% block title %}Anomalías Detectadas{% endblock %}
 
@@ -77,8 +77,9 @@
                 <button type="button" class="btn btn-sm btn-warning me-2" onclick="cambiarEstadoMasivo()">
                     <i class="fas fa-edit me-1"></i>Cambiar Estado
                 </button>
-                <button type="button" class="btn btn-sm btn-success" onclick="exportarSeleccionadas()">
-                    <i class="fas fa-download me-1"></i>Exportar
+                <!-- <button onclick="exportarSeleccionadas()">Exportar Seleccionadas</button> -->
+                <button class="btn btn-secondary" disabled>
+                    Exportar Seleccionadas (En desarrollo)
                 </button>
             </div>
         </div>
@@ -135,7 +136,7 @@
                                 <tr class="anomalia-row">
                                     <td>
                                         <input type="checkbox" class="form-check-input anomalia-checkbox" 
-                                               value="{{ anomalia.id }}" data-estudiante="{{ anomalia.estudiante.nombre }}">
+                                                value="{{ anomalia.id }}" data-estudiante="{{ anomalia.estudiante.nombre }}">
                                     </td>
                                     <td>
                                         <div class="d-flex align-items-center">
@@ -418,7 +419,7 @@
                 <h5 class="modal-title">Cambiar Estado Masivo</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form id="formCambiarEstado" method="post" action="{% url 'gestion_masiva_anomalias' %}">
+            <form id="formCambiarEstado" method="post" action="#">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="cambiar_estado">
                 <div class="modal-body">
@@ -587,50 +588,6 @@ function cambiarEstadoMasivo() {
     // Mostrar modal
     const modal = new bootstrap.Modal(document.getElementById('cambiarEstadoModal'));
     modal.show();
-}
-
-// Exportar anomalías seleccionadas
-function exportarSeleccionadas() {
-    if (anomaliasSeleccionadas.length === 0) {
-        alert('No hay anomalías seleccionadas para exportar');
-        return;
-    }
-    
-    console.log('📊 Exportando anomalías seleccionadas:', anomaliasSeleccionadas);
-    
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '{% url "gestion_masiva_anomalias" %}';
-    
-    // CSRF token
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
-    if (csrfToken) {
-        const csrfInput = document.createElement('input');
-        csrfInput.type = 'hidden';
-        csrfInput.name = 'csrfmiddlewaretoken';
-        csrfInput.value = csrfToken.value;
-        form.appendChild(csrfInput);
-    }
-    
-    // Action
-    const actionInput = document.createElement('input');
-    actionInput.type = 'hidden';
-    actionInput.name = 'action';
-    actionInput.value = 'exportar';
-    form.appendChild(actionInput);
-    
-    // IDs seleccionados
-    anomaliasSeleccionadas.forEach(id => {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'anomalias_seleccionadas';
-        input.value = id;
-        form.appendChild(input);
-    });
-    
-    document.body.appendChild(form);
-    form.submit();
-    document.body.removeChild(form);
 }
 
 // CORREGIDO: Exportar todas las anomalías (respetando filtros)

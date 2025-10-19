@@ -4,7 +4,6 @@ from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
 
-
 class Usuario(AbstractUser):
     ROLES = [
         ('analista_cpa', 'Analista CPA'),
@@ -91,6 +90,9 @@ class CriterioAnomalia(models.Model):
         return f"{self.nombre} - {self.carrera.nombre if self.carrera else 'General'}"
 
 class DeteccionAnomalia(models.Model):
+    """
+    Modelo para almacenar detecciones de anomalías académicas
+    """
     TIPOS_ANOMALIA = [
         ('bajo_rendimiento', 'Bajo Rendimiento'),
         ('baja_asistencia', 'Baja Asistencia'),
@@ -108,6 +110,21 @@ class DeteccionAnomalia(models.Model):
         ('falso_positivo', 'Falso Positivo'),
     ]
     
+    NIVELES_CRITICIDAD = [
+        ('baja', 'Baja'),
+        ('media', 'Media'),
+        ('alta', 'Alta'),
+    ]
+    
+    # ✅ CORREGIDO: Estados coinciden con ESTADOS arriba
+    TRANSICIONES_ESTADO = {
+        'detectado': ['en_revision', 'falso_positivo'],  # ← Cambiado
+        'en_revision': ['resuelto', 'intervencion_activa', 'falso_positivo'],  # ← Cambiado
+        'intervencion_activa': ['resuelto'],  # ← Cambiado
+        'resuelto': [],
+        'falso_positivo': []
+    }
+
     estudiante = models.ForeignKey(Estudiante, on_delete=models.CASCADE)
     criterio_usado = models.ForeignKey(CriterioAnomalia, on_delete=models.SET_NULL, null=True)
     tipo_anomalia = models.CharField(max_length=30, choices=TIPOS_ANOMALIA)
@@ -123,6 +140,14 @@ class DeteccionAnomalia(models.Model):
     estado = models.CharField(max_length=20, choices=ESTADOS, default='detectado')
     prioridad = models.IntegerField(default=1, validators=[MinValueValidator(1), MaxValueValidator(5)])
     
+    # ✅ Campo nivel_criticidad - CORRECTO
+    nivel_criticidad = models.CharField(
+        max_length=10,
+        choices=NIVELES_CRITICIDAD,
+        default='media',
+        help_text='Nivel de criticidad: baja, media o alta'
+    )
+    
     fecha_deteccion = models.DateTimeField(default=timezone.now)
     fecha_ultima_actualizacion = models.DateTimeField(auto_now=True)
     
@@ -130,10 +155,71 @@ class DeteccionAnomalia(models.Model):
     revisado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True)
     
     class Meta:
-        ordering = ['-fecha_deteccion', 'prioridad']
+        verbose_name = "Detección de Anomalía"
+        verbose_name_plural = "Detecciones de Anomalías"
+        ordering = ['-fecha_deteccion']  # ✅ Solo una vez
     
     def __str__(self):
+        # ✅ Solo un __str__, el más completo
         return f"{self.estudiante.nombre} - {self.get_tipo_anomalia_display()} ({self.get_estado_display()})"
+
+    def es_transicion_valida(self, nuevo_estado):
+        """Valida si el cambio de estado es permitido"""
+        estados_permitidos = self.TRANSICIONES_ESTADO.get(self.estado, [])
+        return nuevo_estado in estados_permitidos
+
+    def actualizar_estado(self, nuevo_estado, observaciones='', usuario=None):
+        """
+        Actualiza el estado de la anomalía con validaciones
+        
+        🎓 NOTA: Cambié el nombre de actualizar_anomalia_estado a actualizar_estado
+        para que sea más simple de usar
+        """
+        if not self.es_transicion_valida(nuevo_estado):
+            raise ValueError(
+                f"No se puede cambiar de '{self.estado}' a '{nuevo_estado}'"
+            )
+        
+        # Guardar estado anterior para auditoría
+        estado_anterior = self.estado
+        
+        # Actualizar
+        self.estado = nuevo_estado
+        self.observaciones = observaciones
+        self.fecha_ultima_actualizacion = timezone.now()  # ✅ Corregido campo
+        
+        if usuario:
+            self.revisado_por = usuario  # ✅ Corregido nombre de campo
+        
+        self.save()
+        
+        # Registrar en log de auditoría
+        self.registrar_cambio_estado(estado_anterior, nuevo_estado, usuario)
+        
+        return True
+
+    def registrar_cambio_estado(self, estado_anterior, estado_nuevo, usuario):
+        """Registra el cambio de estado en log de auditoría"""
+        # Aquí podrías crear un modelo LogCambioEstado si quieres
+        # trazabilidad completa
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(
+            f"Anomalía {self.id}: {estado_anterior} → {estado_nuevo} "
+            f"por {usuario.get_full_name() if usuario else 'Sistema'}"
+        )
+    
+    def puede_ser_derivada(self):
+        """Verifica si la anomalía puede ser derivada"""
+        return self.estado in ['en_revision', 'detectado']
+    
+    def es_critica(self):
+        """Verifica si la anomalía es de nivel crítico"""
+        return self.nivel_criticidad == 'alta'
+    
+    def dias_sin_atencion(self):
+        """Calcula días transcurridos sin atención"""
+        return (timezone.now() - self.fecha_deteccion).days
 
 class InstanciaApoyo(models.Model):
     TIPOS_APOYO = [
