@@ -27,17 +27,41 @@
     <!-- Estado General -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="alert alert-{% if estado_general == 'OK' %}success{% else %}warning{% endif %} d-flex align-items-center">
-                <i class="fas fa-{% if estado_general == 'OK' %}check-circle{% else %}exclamation-triangle{% endif %} fa-2x me-3"></i>
-                <div>
-                    <h5 class="mb-1">Estado General: {{ estado_general }}</h5>
-                    {% if problemas %}
-                    <p class="mb-0">Se detectaron {{ problemas|length }} problema(s) que requieren atención.</p>
-                    {% else %}
-                    <p class="mb-0">El sistema está funcionando correctamente.</p>
-                    {% endif %}
+            {% if problemas %}
+                {% if estado_display == 'Atención Requerida' %}
+                    <div class="alert alert-danger d-flex align-items-center">
+                        <i class="fas fa-exclamation-circle fa-2x me-3"></i>
+                        <div>
+                            <h5 class="mb-1"><strong>{{ estado_display }}</strong></h5>
+                            <p class="mb-0">{{ estado_mensaje }}</p>
+                        </div>
+                    </div>
+                {% elif estado_display == 'Advertencia' %}
+                    <div class="alert alert-warning d-flex align-items-center">
+                        <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
+                        <div>
+                            <h5 class="mb-1"><strong>{{ estado_display }}</strong></h5>
+                            <p class="mb-0">{{ estado_mensaje }}</p>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="alert alert-info d-flex align-items-center">
+                        <i class="fas fa-info-circle fa-2x me-3"></i>
+                        <div>
+                            <h5 class="mb-1"><strong>{{ estado_display }}</strong></h5>
+                            <p class="mb-0">{{ estado_mensaje }}</p>
+                        </div>
+                    </div>
+                {% endif %}
+            {% else %}
+                <div class="alert alert-success d-flex align-items-center">
+                    <i class="fas fa-check-circle fa-2x me-3"></i>
+                    <div>
+                        <h5 class="mb-1"><strong>{{ estado_display }}</strong></h5>
+                        <p class="mb-0">{{ estado_mensaje }}</p>
+                    </div>
                 </div>
-            </div>
+            {% endif %}
         </div>
     </div>
  
@@ -98,21 +122,40 @@
     {% if problemas %}
     <div class="row mb-4">
         <div class="col-12">
-            <div class="card border-danger">
-                <div class="card-header bg-danger text-white">
+            <div class="card {% if estado_display == 'Atención Requerida' %}border-danger{% elif estado_display == 'Advertencia' %}border-warning{% else %}border-info{% endif %}">
+                <div class="card-header {% if estado_display == 'Atención Requerida' %}bg-danger{% elif estado_display == 'Advertencia' %}bg-warning{% else %}bg-info{% endif %} text-white">
                     <h5 class="mb-0">
-                        <i class="fas fa-bug me-2"></i>Problemas Detectados
+                        <i class="fas fa-list-ul me-2"></i>Observaciones del Sistema ({{ problemas|length }})
                     </h5>
                 </div>
                 <div class="card-body">
-                    <ul class="list-unstyled mb-0">
-                        {% for problema in problemas %}
-                        <li class="mb-2">
-                            <i class="fas fa-times-circle text-danger me-2"></i>
-                            {{ problema }}
-                        </li>
-                        {% endfor %}
-                    </ul>
+                    {% for problema in problemas %}
+                    <div class="mb-3 {% if not forloop.last %}pb-3 border-bottom{% endif %}">
+                        <div class="d-flex align-items-start">
+                            <div class="me-3">
+                                {% if problema.gravedad == 'alta' %}
+                                    <i class="fas fa-exclamation-circle text-danger fa-2x"></i>
+                                {% elif problema.gravedad == 'media' %}
+                                    <i class="fas fa-exclamation-triangle text-warning fa-2x"></i>
+                                {% else %}
+                                    <i class="fas fa-info-circle text-info fa-2x"></i>
+                                {% endif %}
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1">
+                                    <strong>{{ problema.titulo }}</strong>
+                                    <span class="badge bg-{% if problema.gravedad == 'alta' %}danger{% elif problema.gravedad == 'media' %}warning{% else %}secondary{% endif %} ms-2">
+                                        {% if problema.gravedad == 'alta' %}Crítico{% elif problema.gravedad == 'media' %}Advertencia{% else %}Info{% endif %}
+                                    </span>
+                                </h6>
+                                <p class="mb-2 text-muted">{{ problema.descripcion }}</p>
+                                <p class="mb-0">
+                                    <small><i class="fas fa-lightbulb text-warning me-1"></i><strong>Acción sugerida:</strong> {{ problema.accion }}</small>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
         </div>

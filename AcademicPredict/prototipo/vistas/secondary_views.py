@@ -1,9 +1,10 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.http import JsonResponse
 from django.db.models import Q
 import logging
-from ..models import (Carrera, AlertaAutomatica)
-from ..utils.helpers import (_obtener_estadisticas_sistema, _determinar_estado_sistema, _calcular_asignaturas_criticas)
+from ..models import (Carrera, AlertaAutomatica, Derivacion)
+from ..utils.helpers import (_obtener_estadisticas_sistema, _determinar_estado_sistema, _calcular_asignaturas_criticas, detalle_derivacion_ajax)
 from ..utils.permissions import (puede_administrar_sistema, puede_ver_estadisticas)
 
 # ================================================================
@@ -24,14 +25,27 @@ def asignaturas_criticas(request):
     🎓 EDUCATIVO: Enfocarse en una sola responsabilidad:
     mostrar asignaturas con alto índice de anomalías.
     """
+    from ..models import Asignatura
 
     # Obtener asignaturas con más anomalías
     asignaturas_data = _calcular_asignaturas_criticas()
 
+    # Calcular estadísticas adicionales
+    total_asignaturas = Asignatura.objects.count()
+    total_criticas = len(asignaturas_data)
+
+    # Calcular promedio de anomalías
+    if asignaturas_data:
+        promedio_anomalias = sum(a['porcentaje_anomalias'] for a in asignaturas_data) / len(asignaturas_data)
+    else:
+        promedio_anomalias = 0
+
     context = {
         'asignaturas_criticas': asignaturas_data,
-        'umbral_critico': 20,  # 20% de estudiantes con anomalías
-        'total_asignaturas': len(asignaturas_data)
+        'umbral_criticidad': 20,  # 20% de estudiantes con anomalías
+        'total_asignaturas': total_asignaturas,
+        'total_criticas': total_criticas,
+        'promedio_anomalias_carrera': promedio_anomalias
     }
 
     return render(request, 'anomalias/asignaturas_criticas.html', context)
@@ -48,20 +62,56 @@ def verificar_sistema(request):
     stats = _obtener_estadisticas_sistema()
     estado_sistema = _determinar_estado_sistema(stats)
 
-    # Detectar problemas específicos
+    # Detectar problemas específicos con mensajes más claros
     problemas = []
     if stats.get('criterios_activos', 0) == 0:
-        problemas.append('No hay criterios activos configurados')
+        problemas.append({
+            'titulo': 'Sin criterios configurados',
+            'descripcion': 'No hay criterios de detección activos. Configure al menos un criterio para detectar anomalías.',
+            'accion': 'Ir a Configuración de Criterios',
+            'gravedad': 'alta'
+        })
     if stats.get('estudiantes_activos', 0) < 10:
-        problemas.append('Muy pocos estudiantes activos en el sistema')
+        problemas.append({
+            'titulo': f'Pocos estudiantes activos ({stats.get("estudiantes_activos", 0)})',
+            'descripcion': 'El sistema necesita al menos 10 estudiantes activos para funcionar correctamente.',
+            'accion': 'Importar más datos de estudiantes',
+            'gravedad': 'media'
+        })
     if stats.get('registros_academicos', 0) < 30:
-        problemas.append('Insuficientes registros académicos para análisis')
+        problemas.append({
+            'titulo': f'Registros académicos insuficientes ({stats.get("registros_academicos", 0)})',
+            'descripcion': 'Se requieren al menos 30 registros académicos para realizar análisis confiables.',
+            'accion': 'Importar registros académicos',
+            'gravedad': 'media'
+        })
     if stats.get('anomalias_pendientes', 0) > stats.get('anomalias_total', 1) * 0.8:
-        problemas.append('Muchas anomalías pendientes de revisión')
+        problemas.append({
+            'titulo': f'Muchas anomalías pendientes ({stats.get("anomalias_pendientes", 0)})',
+            'descripcion': 'Más del 80% de las anomalías están pendientes de revisión.',
+            'accion': 'Revisar anomalías pendientes',
+            'gravedad': 'baja'
+        })
+
+    # Determinar estado general más descriptivo
+    if not problemas:
+        estado_display = 'Operativo'
+        estado_mensaje = 'El sistema está funcionando correctamente sin problemas detectados.'
+    elif any(p['gravedad'] == 'alta' for p in problemas):
+        estado_display = 'Atención Requerida'
+        estado_mensaje = 'Se detectaron problemas críticos que requieren atención inmediata.'
+    elif any(p['gravedad'] == 'media' for p in problemas):
+        estado_display = 'Advertencia'
+        estado_mensaje = 'Se detectaron advertencias que deberían ser atendidas pronto.'
+    else:
+        estado_display = 'Operativo con Observaciones'
+        estado_mensaje = 'El sistema funciona pero hay observaciones menores.'
 
     context = {
         'stats': stats,
         'estado_general': estado_sistema.get('estado', 'unknown'),
+        'estado_display': estado_display,
+        'estado_mensaje': estado_mensaje,
         'problemas': problemas
     }
 
@@ -185,3 +235,34 @@ def alertas_usuario(request):
     }
 
     return render(request, 'anomalias/alertas.html', context)
+
+@login_required
+@user_passes_test(lambda u: u.rol in ['analista_cpa', 'coordinador_cpa', 'coordinador_carrera', 'admin'])
+def detalle_derivacion_view(request, derivacion_id):
+    """
+    Vista para obtener detalles de una derivación (AJAX o JSON response)
+
+    Envuelve la función helper detalle_derivacion_ajax y retorna JSON
+    """
+    try:
+        detalles = detalle_derivacion_ajax(derivacion_id, request.user)
+        return JsonResponse({
+            'success': True,
+            'data': detalles
+        })
+    except Derivacion.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': f'Derivación {derivacion_id} no encontrada'
+        }, status=404)
+    except PermissionError as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=403)
+    except Exception as e:
+        logger.error(f"Error obteniendo detalle de derivación {derivacion_id}: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Error interno: {str(e)}'
+        }, status=500)

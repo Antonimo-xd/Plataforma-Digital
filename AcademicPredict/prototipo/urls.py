@@ -9,15 +9,13 @@ from django.conf import settings
 from . import views
 
 # 🔧 VISTAS SECUNDARIAS (Solo las optimizadas)
-from .vistas.secondary_views import (asignaturas_criticas, alertas_usuario, verificar_sistema,)
+from .vistas.secondary_views import (asignaturas_criticas, alertas_usuario, verificar_sistema, detalle_derivacion_view)
 
 # 📊 APIs DEL DASHBOARD (Mantener todas)
 from .api.dashboard_api import ( api_datos_dashboard, api_evolucion_anomalias, api_tipos_anomalias, api_datos_tiempo_real, api_alertas_count, api_distribucion_carrera, api_registros_semestre, api_estadisticas_distribucion, api_estudiante_detalle, api_exportar_datos_avanzado)
 
 # 📋 SERVICIOS DE REPORTES (Con nuevas funciones optimizadas)
 from .services.reports_service import ( exportar_reporte_derivaciones, exportar_todas_anomalias)
-
-from .utils.helpers import detalle_derivacion_ajax
 
 # ================================================================
 # CONFIGURACIÓN DE URLs OPTIMIZADA
@@ -64,7 +62,7 @@ urlpatterns = [
     
     path('derivaciones/', views.gestionar_derivaciones, name='gestionar_derivaciones'),
     path('anomalias/<int:anomalia_id>/derivar/', views.crear_derivacion, name='crear_derivacion'),
-    path('derivaciones/<int:derivacion_id>/detalle/',detalle_derivacion_ajax, name='detalle_derivacion_ajax'),
+    path('derivaciones/<int:derivacion_id>/detalle/', detalle_derivacion_view, name='detalle_derivacion_ajax'),
     path('derivaciones/<int:derivacion_id>/actualizar-estado/', views.actualizar_estado_derivacion, name='actualizar_estado_derivacion'),
     
     # ================================================================
