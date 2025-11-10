@@ -17,6 +17,8 @@ from .api.dashboard_api import ( api_datos_dashboard, api_evolucion_anomalias, a
 # 📋 SERVICIOS DE REPORTES (Con nuevas funciones optimizadas)
 from .services.reports_service import ( exportar_reporte_derivaciones, exportar_todas_anomalias)
 
+from .utils.helpers import detalle_derivacion_ajax
+
 # ================================================================
 # CONFIGURACIÓN DE URLs OPTIMIZADA
 # ================================================================
@@ -31,12 +33,13 @@ urlpatterns = [
     path('', views.dashboard, name='dashboard'),
     
     # ================================================================
-    # 📋 GESTIÓN DE ANOMALÍAS (Core functionality)  
+    # 📋 GESTIÓN DE ANOMALÍAS (Core functionality)
     # ================================================================
-    
-    path('anomalias/', views.ListadoAnomaliasView.as_view(), name='listado_anomalias'),
+
+    path('anomalias/', views.listado_anomalias, name='listado_anomalias'),
     path('anomalias/<int:pk>/', views.detalle_anomalia, name='detalle_anomalia'),
     path('anomalias/<int:anomalia_id>/actualizar-estado/', views.actualizar_estado_anomalia, name='actualizar_estado_anomalia'),
+    path('anomalias/gestion-masiva/', views.gestion_masiva_anomalias, name='gestion_masiva_anomalias'),
 
     # ================================================================
     # 🔧 IMPORTAR DATOS
@@ -61,6 +64,8 @@ urlpatterns = [
     
     path('derivaciones/', views.gestionar_derivaciones, name='gestionar_derivaciones'),
     path('anomalias/<int:anomalia_id>/derivar/', views.crear_derivacion, name='crear_derivacion'),
+    path('derivaciones/<int:derivacion_id>/detalle/',detalle_derivacion_ajax, name='detalle_derivacion_ajax'),
+    path('derivaciones/<int:derivacion_id>/actualizar-estado/', views.actualizar_estado_derivacion, name='actualizar_estado_derivacion'),
     
     # ================================================================
     # 🎯 VISTAS SECUNDARIAS (Solo las optimizadas)
@@ -69,6 +74,9 @@ urlpatterns = [
     path('alertas/', alertas_usuario, name='alertas_usuario'),
     path('asignaturas-criticas/', asignaturas_criticas, name='asignaturas_criticas'), 
     path('verificar-sistema/', verificar_sistema, name='verificar_sistema'),
+
+    # Perfil de usuario
+    path('perfil/', views.perfil_usuario, name='perfil_usuario'),  # ← NUEVA
 
     # ================================================================
     # 📊 REPORTES Y EXPORTACIONES (Optimizadas)
@@ -102,5 +110,7 @@ urlpatterns = [
     
     # APIs de exportación avanzada
     path('api/exportar-datos-avanzado/', api_exportar_datos_avanzado, name='api_exportar_datos_avanzado'),
+
+    path('ayuda/', views.ayuda_documentacion, name='ayuda_documentacion'),
     
 ]
