@@ -497,7 +497,7 @@ def gestion_masiva_anomalias(request):
             prioridad = request.POST.get('prioridad', 3)
 
             try:
-                instancia = InstanciaApoyo.objects.get(id=instancia_id, activa=True)
+                instancia = InstanciaApoyo.objects.get(id=instancia_id, activo=True)
                 count_derivadas = 0
 
                 for anomalia in anomalias:
@@ -1530,7 +1530,7 @@ def listado_anomalias(request):
     total_anomalias = queryset.count()
 
     # Instancias de apoyo para derivaciones masivas
-    instancias_apoyo = InstanciaApoyo.objects.filter(activa=True).order_by('nombre')
+    instancias_apoyo = InstanciaApoyo.objects.filter(activo=True).order_by('nombre')
 
     # Contexto completo
     context = {

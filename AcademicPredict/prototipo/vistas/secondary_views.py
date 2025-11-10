@@ -16,23 +16,28 @@ logger = logging.getLogger(__name__)
 # ================================================================
 
 @login_required
-@user_passes_test(puede_ver_estadisticas)
 def asignaturas_criticas(request):
     """
     Vista simplificada para análisis de asignaturas críticas
-    
+
     🎓 EDUCATIVO: Enfocarse en una sola responsabilidad:
     mostrar asignaturas con alto índice de anomalías.
     """
+    # Verificar permisos manualmente para evitar bucle de redirección
+    if not hasattr(request.user, 'rol') or not puede_ver_estadisticas(request.user):
+        from django.contrib import messages
+        messages.error(request, 'No tienes permisos para acceder a esta página.')
+        return redirect('dashboard')
+
     # Obtener asignaturas con más anomalías
     asignaturas_data = _calcular_asignaturas_criticas()
-    
+
     context = {
         'asignaturas_criticas': asignaturas_data,
         'umbral_critico': 20,  # 20% de estudiantes con anomalías
         'total_asignaturas': len(asignaturas_data)
     }
-    
+
     return render(request, 'anomalias/asignaturas_criticas.html', context)
 
 @login_required
@@ -100,7 +105,7 @@ def alertas_usuario(request):
     # Agrupar por estudiante para evitar duplicados
     estudiantes_criticos = {}
     for anomalia in anomalias_criticas:
-        estudiante_id = anomalia.estudiante.id
+        estudiante_id = anomalia.estudiante.pk  # usar pk en lugar de id
         if estudiante_id not in estudiantes_criticos:
             estudiantes_criticos[estudiante_id] = {
                 'estudiante': anomalia.estudiante,
