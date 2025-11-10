@@ -56,31 +56,118 @@ def verificar_sistema(request):
 @login_required
 def alertas_usuario(request):
     """
-    Vista simplificada para alertas del usuario
-    
+    Vista mejorada para alertas del usuario
+
     🎓 EDUCATIVO: Filtrar alertas según el rol del usuario
-    para mostrar solo información relevante.
+    y mostrar información relevante sobre anomalías críticas.
     """
-    # Filtrar alertas según rol
-    alertas = AlertaAutomatica.objects.filter(activa=True)
-    
+    from ..models import DeteccionAnomalia
+    from django.urls import reverse
+
+    # ================================================================
+    # 1. ALERTAS AUTOMÁTICAS
+    # ================================================================
+    alertas_sistema = AlertaAutomatica.objects.filter(activa=True)
+
     if request.user.rol == 'coordinador_carrera':
         # Solo alertas de su carrera
         try:
             carrera = Carrera.objects.get(coordinador=request.user)
-            alertas = alertas.filter(
+            alertas_sistema = alertas_sistema.filter(
                 Q(deteccion_relacionada__estudiante__carrera=carrera) |
                 Q(asignatura_relacionada__carrera=carrera) |
                 Q(deteccion_relacionada__isnull=True, asignatura_relacionada__isnull=True)
             )
         except Carrera.DoesNotExist:
-            alertas = alertas.none()
-    
-    alertas = alertas.order_by('-fecha_creacion')[:20]
-    
+            alertas_sistema = alertas_sistema.none()
+
+    # ================================================================
+    # 2. PERSONAS CON ANOMALÍAS CRÍTICAS
+    # ================================================================
+    anomalias_criticas = DeteccionAnomalia.objects.filter(
+        nivel_criticidad='alta',
+        estado__in=['detectado', 'en_revision', 'intervencion_activa']
+    ).select_related('estudiante', 'estudiante__carrera')
+
+    # Filtrar por rol
+    if request.user.rol == 'coordinador_carrera':
+        try:
+            carrera = Carrera.objects.get(coordinador=request.user)
+            anomalias_criticas = anomalias_criticas.filter(estudiante__carrera=carrera)
+        except Carrera.DoesNotExist:
+            anomalias_criticas = anomalias_criticas.none()
+
+    # Agrupar por estudiante para evitar duplicados
+    estudiantes_criticos = {}
+    for anomalia in anomalias_criticas:
+        estudiante_id = anomalia.estudiante.id
+        if estudiante_id not in estudiantes_criticos:
+            estudiantes_criticos[estudiante_id] = {
+                'estudiante': anomalia.estudiante,
+                'anomalias': [],
+                'prioridad_maxima': 0,
+                'score_minimo': 100
+            }
+
+        estudiantes_criticos[estudiante_id]['anomalias'].append(anomalia)
+        estudiantes_criticos[estudiante_id]['prioridad_maxima'] = max(
+            estudiantes_criticos[estudiante_id]['prioridad_maxima'],
+            anomalia.prioridad
+        )
+        estudiantes_criticos[estudiante_id]['score_minimo'] = min(
+            estudiantes_criticos[estudiante_id]['score_minimo'],
+            anomalia.score_anomalia
+        )
+
+    # Ordenar por prioridad y score
+    estudiantes_criticos_lista = sorted(
+        estudiantes_criticos.values(),
+        key=lambda x: (-x['prioridad_maxima'], x['score_minimo'])
+    )
+
+    # ================================================================
+    # 3. FORMATEAR ALERTAS PARA EL TEMPLATE
+    # ================================================================
+    alertas_formateadas = []
+
+    # Agregar alertas de sistema
+    for alerta in alertas_sistema.order_by('-fecha_creacion')[:10]:
+        icono = 'fas fa-exclamation-circle'
+        color = 'warning'
+        url = '#'
+
+        if alerta.tipo_alerta == 'nueva_anomalia':
+            icono = 'fas fa-user-exclamation'
+            color = 'info'
+            if alerta.deteccion_relacionada:
+                url = reverse('detalle_anomalia', args=[alerta.deteccion_relacionada.id])
+        elif alerta.tipo_alerta == 'anomalia_critica':
+            icono = 'fas fa-exclamation-triangle'
+            color = 'danger'
+            if alerta.deteccion_relacionada:
+                url = reverse('detalle_anomalia', args=[alerta.deteccion_relacionada.id])
+        elif alerta.tipo_alerta == 'asignatura_critica':
+            icono = 'fas fa-book-dead'
+            color = 'warning'
+            url = reverse('asignaturas_criticas')
+        elif alerta.tipo_alerta == 'seguimiento_vencido':
+            icono = 'fas fa-clock'
+            color = 'secondary'
+
+        alertas_formateadas.append({
+            'titulo': alerta.titulo,
+            'mensaje': alerta.mensaje,
+            'fecha': alerta.fecha_creacion,
+            'icono': icono,
+            'color': color,
+            'url': url
+        })
+
     context = {
-        'alertas': alertas,
-        'total_alertas': alertas.count()
+        'alertas': alertas_formateadas,
+        'total_alertas': len(alertas_formateadas),
+        'estudiantes_criticos': estudiantes_criticos_lista,
+        'total_criticos': len(estudiantes_criticos_lista)
     }
-    
+
     return render(request, 'anomalias/alertas.html', context)

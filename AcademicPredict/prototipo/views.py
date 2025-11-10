@@ -485,11 +485,49 @@ def gestion_masiva_anomalias(request):
                 messages.success(request, f'Se actualizó el estado de {count} anomalías a "{dict(DeteccionAnomalia.ESTADOS)[nuevo_estado]}".')
             else:
                 messages.error(request, 'Estado inválido.')
-        
+
         elif action == 'exportar':
             # Exportar solo las anomalías seleccionadas
-            return generar_reporte_anomalias_seleccionadas(request, anomalia_ids)
-        
+            return generar_reporte_anomalias_seleccionadas(anomalias, request)
+
+        elif action == 'derivar_masivo':
+            # Derivar masivamente
+            instancia_id = request.POST.get('instancia_apoyo')
+            motivo = request.POST.get('motivo', '')
+            prioridad = request.POST.get('prioridad', 3)
+
+            try:
+                instancia = InstanciaApoyo.objects.get(id=instancia_id, activa=True)
+                count_derivadas = 0
+
+                for anomalia in anomalias:
+                    # Solo derivar si puede ser derivada
+                    if anomalia.puede_ser_derivada():
+                        Derivacion.objects.create(
+                            deteccion_anomalia=anomalia,
+                            instancia_apoyo=instancia,
+                            motivo=motivo,
+                            prioridad=int(prioridad),
+                            derivado_por=request.user,
+                            estado='pendiente'
+                        )
+                        # Actualizar estado de la anomalía
+                        anomalia.estado = 'intervencion_activa'
+                        anomalia.revisado_por = request.user
+                        anomalia.fecha_ultima_actualizacion = timezone.now()
+                        anomalia.save()
+                        count_derivadas += 1
+
+                if count_derivadas > 0:
+                    messages.success(request, f'Se derivaron {count_derivadas} anomalías a "{instancia.nombre}".')
+                else:
+                    messages.warning(request, 'No se pudo derivar ninguna anomalía. Verifica que estén en estado válido.')
+
+            except InstanciaApoyo.DoesNotExist:
+                messages.error(request, 'Instancia de apoyo no encontrada.')
+            except ValueError as e:
+                messages.error(request, f'Error en los datos: {str(e)}')
+
         else:
             messages.error(request, f'Acción no válida: {action}.')
         
@@ -1491,6 +1529,9 @@ def listado_anomalias(request):
     # Estadísticas rápidas
     total_anomalias = queryset.count()
 
+    # Instancias de apoyo para derivaciones masivas
+    instancias_apoyo = InstanciaApoyo.objects.filter(activa=True).order_by('nombre')
+
     # Contexto completo
     context = {
         'anomalias': page_obj,  # Django espera 'object_list' o el nombre personalizado
@@ -1503,6 +1544,7 @@ def listado_anomalias(request):
         'carreras_disponibles': carreras_disponibles,
         'total_anomalias': total_anomalias,
         'usuario_rol': request.user.rol,
+        'instancias_apoyo': instancias_apoyo,
     }
 
     print(f"📋 Context data preparado - Total anomalías: {total_anomalias}")

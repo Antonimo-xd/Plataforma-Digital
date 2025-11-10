@@ -74,9 +74,11 @@
                 <button type="button" class="btn btn-sm btn-warning me-2" onclick="cambiarEstadoMasivo()">
                     <i class="fas fa-edit me-1"></i>Cambiar Estado
                 </button>
-                <!-- <button onclick="exportarSeleccionadas()">Exportar Seleccionadas</button> -->
-                <button class="btn btn-secondary" disabled>
-                    Exportar Seleccionadas (En desarrollo)
+                <button type="button" class="btn btn-sm btn-success me-2" onclick="exportarSeleccionadas()">
+                    <i class="fas fa-download me-1"></i>Exportar Seleccionadas
+                </button>
+                <button type="button" class="btn btn-sm btn-primary" onclick="derivarMasivo()">
+                    <i class="fas fa-share me-1"></i>Derivar
                 </button>
             </div>
         </div>
@@ -421,7 +423,7 @@
                 <input type="hidden" name="action" value="cambiar_estado">
                 <div class="modal-body">
                     <p>¿Estás seguro de cambiar el estado de las <span id="cantidadSeleccionadas">0</span> anomalías seleccionadas?</p>
-                    
+
                     <div class="mb-3">
                         <label class="form-label">Nuevo Estado</label>
                         <select name="nuevo_estado" class="form-select" required>
@@ -435,6 +437,57 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-warning">Cambiar Estado</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para derivación masiva -->
+<div class="modal fade" id="derivarMasivoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Derivar Anomalías</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formDerivarMasivo" method="post" action="#">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="derivar_masivo">
+                <div class="modal-body">
+                    <p>¿Deseas derivar las <span id="cantidadSeleccionadasDerivar">0</span> anomalías seleccionadas?</p>
+
+                    <div class="mb-3">
+                        <label class="form-label">Instancia de Apoyo</label>
+                        <select name="instancia_apoyo" class="form-select" required>
+                            <option value="">Seleccionar instancia...</option>
+                            {% if instancias_apoyo %}
+                                {% for instancia in instancias_apoyo %}
+                                <option value="{{ instancia.id }}">{{ instancia.nombre }}</option>
+                                {% endfor %}
+                            {% endif %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Motivo</label>
+                        <textarea name="motivo" class="form-control" rows="3" required placeholder="Describe el motivo de la derivación..."></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Prioridad</label>
+                        <select name="prioridad" class="form-select" required>
+                            <option value="3" selected>Media</option>
+                            <option value="1">Baja</option>
+                            <option value="2">Normal</option>
+                            <option value="4">Alta</option>
+                            <option value="5">Crítica</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Derivar Anomalías</button>
                 </div>
             </form>
         </div>
@@ -611,6 +664,85 @@ function exportarTodos() {
         // Redirigir a la URL de exportación
         window.location.href = urlExportacion.toString();
     }
+}
+
+// Exportar anomalías seleccionadas
+function exportarSeleccionadas() {
+    if (anomaliasSeleccionadas.length === 0) {
+        alert('No hay anomalías seleccionadas');
+        return;
+    }
+
+    console.log('📊 Exportando anomalías seleccionadas:', anomaliasSeleccionadas);
+
+    // Crear formulario temporal para enviar las IDs
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '{% url "gestion_masiva_anomalias" %}';
+
+    // CSRF token
+    const csrfToken = getCsrfToken();
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrfmiddlewaretoken';
+    csrfInput.value = csrfToken;
+    form.appendChild(csrfInput);
+
+    // Action
+    const actionInput = document.createElement('input');
+    actionInput.type = 'hidden';
+    actionInput.name = 'action';
+    actionInput.value = 'exportar';
+    form.appendChild(actionInput);
+
+    // IDs seleccionadas
+    anomaliasSeleccionadas.forEach(id => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'anomalias_seleccionadas';
+        input.value = id;
+        form.appendChild(input);
+    });
+
+    // Enviar
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+}
+
+// Derivar anomalías masivamente
+function derivarMasivo() {
+    if (anomaliasSeleccionadas.length === 0) {
+        alert('No hay anomalías seleccionadas');
+        return;
+    }
+
+    const cantidadElement = document.getElementById('cantidadSeleccionadasDerivar');
+    if (cantidadElement) {
+        cantidadElement.textContent = anomaliasSeleccionadas.length;
+    }
+
+    // Agregar IDs al formulario
+    const form = document.getElementById('formDerivarMasivo');
+    if (!form) return;
+
+    // Limpiar inputs anteriores
+    form.querySelectorAll('input[name="anomalias_seleccionadas"]').forEach(input => {
+        input.remove();
+    });
+
+    // Agregar nuevos inputs
+    anomaliasSeleccionadas.forEach(id => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'anomalias_seleccionadas';
+        input.value = id;
+        form.appendChild(input);
+    });
+
+    // Mostrar modal
+    const modal = new bootstrap.Modal(document.getElementById('derivarMasivoModal'));
+    modal.show();
 }
 
 // Función auxiliar para obtener el CSRF token
