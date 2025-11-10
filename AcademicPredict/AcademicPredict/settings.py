@@ -71,12 +71,15 @@ WSGI_APPLICATION = 'AcademicPredict.wsgi.application'
 
 DATABASES = {
     'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': 'postgres',
-            'USER': 'postgres.faesxhsrvrgdpzwtcwhg',
-            'PASSWORD': '6FPwHuKmVjlZz10n',
-            'HOST': 'aws-0-sa-east-1.pooler.supabase.com',
-            'PORT': '6543',
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'django',  # nombre de tu base en phpMyAdmin
+        'USER': 'django_user',              # usuario de MySQL
+        'PASSWORD': '',              # contraseña (por defecto vacío en WAMP)
+        'HOST': 'localhost',
+        'PORT': '3306',
+        'OPTIONS': {
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+        },
     }
 }
 
@@ -111,7 +114,7 @@ USE_I18N = True
 
 USE_TZ = True
 
-
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 5000
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
@@ -134,6 +137,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/cpa/'
 LOGOUT_REDIRECT_URL = '/login/'
+
 
 # Email configuration (para notificaciones)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

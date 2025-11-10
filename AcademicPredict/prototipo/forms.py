@@ -224,61 +224,6 @@ class RegistroAcademicoForm(forms.ModelForm):
             'porcentaje_uso_plataforma': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.1', 'min': '0', 'max': '100'}),
         }
 
-class ImportarDatosForm(forms.Form):
-    archivo_estudiantes = forms.FileField(
-        required=False,
-        widget=forms.FileInput(attrs={
-            'class': 'form-control',
-            'accept': '.csv,.xlsx,.xls',
-            'title': 'Seleccionar archivo de estudiantes'
-        }),
-        help_text='Archivo CSV o Excel con columnas: IdEstudiante, Nombre, Carrera, Ingreso_año'
-    )
-    
-    archivo_asignaturas = forms.FileField(
-        required=False,
-        widget=forms.FileInput(attrs={
-            'class': 'form-control',
-            'accept': '.csv,.xlsx,.xls',
-            'title': 'Seleccionar archivo de asignaturas'
-        }),
-        help_text='Archivo CSV o Excel con columnas: Id_Asignatura, NombreAsignatura, Semestre'
-    )
-    
-    archivo_registros = forms.FileField(
-        required=False,
-        widget=forms.FileInput(attrs={
-            'class': 'form-control',
-            'accept': '.csv,.xlsx,.xls',
-            'title': 'Seleccionar archivo de registros académicos'
-        }),
-        help_text='Archivo CSV o Excel con columnas: Id_Estudiante, Id_asignatura, Nota1, Nota2, Nota3, Nota4, % de Asistencia, % de Uso de plataforma'
-    )
-    
-    def clean(self):
-        cleaned_data = super().clean()
-        
-        # Validar que al menos un archivo fue subido
-        archivos = [
-            cleaned_data.get('archivo_estudiantes'),
-            cleaned_data.get('archivo_asignaturas'),
-            cleaned_data.get('archivo_registros')
-        ]
-        
-        if not any(archivos):
-            raise forms.ValidationError(
-                'Debes seleccionar al menos un archivo para importar.'
-            )
-        
-        # Validar tamaño de archivos (máximo 10MB cada uno)
-        for campo, archivo in zip(['archivo_estudiantes', 'archivo_asignaturas', 'archivo_registros'], archivos):
-            if archivo and archivo.size > 10 * 1024 * 1024:  # 10MB
-                raise forms.ValidationError(
-                    f'El archivo {campo} es demasiado grande (máximo 10MB).'
-                )
-        
-        return cleaned_data
-
 class FiltroReporteForm(forms.Form):
     fecha_inicio = forms.DateField(
         required=False,
@@ -587,4 +532,58 @@ class FeedbackAnomaliaForm(forms.Form):
             'placeholder': 'Sugerencias para mejorar la detección...'
         })
     )
+
+class ImportarDatosForm(forms.Form):
+    archivo_estudiantes = forms.FileField(
+        required=False,
+        widget=forms.FileInput(attrs={
+            'class': 'form-control',
+            'accept': '.csv,.xlsx,.xls',
+            'title': 'Seleccionar archivo de estudiantes'
+        }),
+        help_text='Archivo CSV o Excel con columnas: IdEstudiante, Nombre, Carrera, Ingreso_año'
+    )
     
+    archivo_asignaturas = forms.FileField(
+        required=False,
+        widget=forms.FileInput(attrs={
+            'class': 'form-control',
+            'accept': '.csv,.xlsx,.xls',
+            'title': 'Seleccionar archivo de asignaturas'
+        }),
+        help_text='Archivo CSV o Excel con columnas: Id_Asignatura, NombreAsignatura, Semestre'
+    )
+    
+    archivo_registros = forms.FileField(
+        required=False,
+        widget=forms.FileInput(attrs={
+            'class': 'form-control',
+            'accept': '.csv,.xlsx,.xls',
+            'title': 'Seleccionar archivo de registros académicos'
+        }),
+        help_text='Archivo CSV o Excel con columnas: Id_Estudiante, Id_asignatura, Nota1, Nota2, Nota3, Nota4, % de Asistencia, % de Uso de plataforma'
+    )
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        
+        # Validar que al menos un archivo fue subido
+        archivos = [
+            cleaned_data.get('archivo_estudiantes'),
+            cleaned_data.get('archivo_asignaturas'),
+            cleaned_data.get('archivo_registros')
+        ]
+        
+        if not any(archivos):
+            raise forms.ValidationError(
+                'Debes seleccionar al menos un archivo para importar.'
+            )
+        
+        # Validar tamaño de archivos (máximo 10MB cada uno)
+        for campo, archivo in zip(['archivo_estudiantes', 'archivo_asignaturas', 'archivo_registros'], archivos):
+            if archivo and archivo.size > 10 * 1024 * 1024:  # 10MB
+                raise forms.ValidationError(
+                    f'El archivo {campo} es demasiado grande (máximo 10MB).'
+                )
+        
+        return cleaned_data

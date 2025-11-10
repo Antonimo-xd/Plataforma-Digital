@@ -495,7 +495,7 @@ class ReportsService:
 # ================================================================
 
 @login_required
-@user_passes_test(lambda u: u.rol in ['coordinador_cpa', 'analista_cpa', 'coordinador_carrera'])
+@user_passes_test(lambda u: u.rol in ['coordinador_cpa', 'analista_cpa', 'coordinador_carrera','admin'])
 def exportar_reporte_derivaciones(request):
     """
     Vista HTTP para exportar derivaciones
@@ -513,7 +513,7 @@ def exportar_reporte_derivaciones(request):
         return redirect('gestionar_derivaciones')
 
 @login_required  
-@user_passes_test(lambda u: u.rol in ['coordinador_cpa', 'analista_cpa'])
+@user_passes_test(lambda u: u.rol in ['coordinador_cpa', 'analista_cpa','admin'])
 def exportar_todas_anomalias(request):
     """
     Vista para exportar TODAS las anomalías sin filtros

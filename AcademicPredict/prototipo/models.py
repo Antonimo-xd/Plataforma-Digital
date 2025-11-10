@@ -9,6 +9,7 @@ class Usuario(AbstractUser):
         ('analista_cpa', 'Analista CPA'),
         ('coordinador_cpa', 'Coordinador CPA'),
         ('coordinador_carrera', 'Coordinador de Carrera'),
+        ('admin', 'Administrador'),
     ]
     rol = models.CharField(max_length=20, choices=ROLES)
     telefono = models.CharField(max_length=15, blank=True)
@@ -125,34 +126,27 @@ class DeteccionAnomalia(models.Model):
         'falso_positivo': []
     }
 
-    estudiante = models.ForeignKey(Estudiante, on_delete=models.CASCADE)
-    criterio_usado = models.ForeignKey(CriterioAnomalia, on_delete=models.SET_NULL, null=True)
     tipo_anomalia = models.CharField(max_length=30, choices=TIPOS_ANOMALIA)
     score_anomalia = models.FloatField()  # Score del Isolation Forest
     confianza = models.FloatField()  # Nivel de confianza de la detección
-    
-    # Métricas del estudiante al momento de la detección
     promedio_general = models.FloatField()
     asistencia_promedio = models.FloatField()
     uso_plataforma_promedio = models.FloatField()
     variacion_notas = models.FloatField()
-    
     estado = models.CharField(max_length=20, choices=ESTADOS, default='detectado')
     prioridad = models.IntegerField(default=1, validators=[MinValueValidator(1), MaxValueValidator(5)])
-    
-    # ✅ Campo nivel_criticidad - CORRECTO
+    fecha_deteccion = models.DateTimeField(default=timezone.now)
+    fecha_ultima_actualizacion = models.DateTimeField(auto_now=True)
+    observaciones = models.TextField(blank=True)
+    criterio_usado = models.ForeignKey(CriterioAnomalia, on_delete=models.SET_NULL, null=True)
+    revisado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True)
+    estudiante = models.ForeignKey(Estudiante, on_delete=models.CASCADE)
     nivel_criticidad = models.CharField(
         max_length=10,
         choices=NIVELES_CRITICIDAD,
         default='media',
         help_text='Nivel de criticidad: baja, media o alta'
     )
-    
-    fecha_deteccion = models.DateTimeField(default=timezone.now)
-    fecha_ultima_actualizacion = models.DateTimeField(auto_now=True)
-    
-    observaciones = models.TextField(blank=True)
-    revisado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True)
     
     class Meta:
         verbose_name = "Detección de Anomalía"

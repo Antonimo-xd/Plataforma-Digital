@@ -6,6 +6,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+CARRERA_ALIASES = {
+    'informatica': 'Ingeniería en Informática',
+    # Puedes agregar más alias si los descubres:
+    # 'comercial': 'Ingeniería Comercial',
+    # 'ing. informatica': 'Ingeniería en Informática',
+}
+
 class ImportService:
     """
     Servicio centralizado para importación de datos académicos
@@ -29,7 +36,7 @@ class ImportService:
             except (UnicodeDecodeError, AttributeError):
                 archivo.seek(0)
                 continue
-        return 'utf-8'  # Default
+        return 'utf-8'
     
     @staticmethod
     def leer_archivo(archivo):
@@ -56,7 +63,7 @@ class ImportService:
                     contenido_str = contenido.decode(encoding)
                 else:
                     contenido_str = contenido
-                
+            
                 df = pd.read_csv(StringIO(contenido_str))
             
             # Limpiar nombres de columnas
@@ -130,9 +137,13 @@ class ImportService:
                     
                     id_estudiante = int(row['IdEstudiante'])
                     nombre = str(row['Nombre']).strip()
-                    carrera_nombre = str(row['Carrera']).strip()
                     ingreso_año = int(row['Ingreso_año'])
                     
+                    carrera_nombre = str(row['Carrera']).strip()
+                    carrera_nombre_normalizado = CARRERA_ALIASES.get(
+                        carrera_nombre.lower(), # Clave: 'informatica'
+                        carrera_nombre          # Valor por defecto: el mismo que venía
+                    )
                     # Validar año de ingreso
                     if ingreso_año < 1900 or ingreso_año > 2030:
                         resultado['errores'].append(
@@ -141,17 +152,17 @@ class ImportService:
                         continue
                     
                     # Obtener o crear carrera
-                    if carrera_nombre not in carreras_cache:
+                    if carrera_nombre_normalizado not in carreras_cache:
                         carrera, created = Carrera.objects.get_or_create(
-                            nombre=carrera_nombre
+                            nombre=carrera_nombre_normalizado
                         )
-                        carreras_cache[carrera_nombre] = carrera
+                        carreras_cache[carrera_nombre_normalizado] = carrera
                         if created:
                             resultado['advertencias'].append(
-                                f'Carrera creada: {carrera_nombre}'
+                                f'Carrera creada: {carrera_nombre_normalizado}'
                             )
                     
-                    carrera = carreras_cache[carrera_nombre]
+                    carrera = carreras_cache[carrera_nombre_normalizado]
                     
                     # Crear o actualizar estudiante
                     estudiante, created = Estudiante.objects.update_or_create(
@@ -159,7 +170,7 @@ class ImportService:
                         defaults={
                             'nombre': nombre,
                             'carrera': carrera,
-                            'año_ingreso': ingreso_año
+                            'ingreso_año': ingreso_año
                         }
                     )
                     
@@ -209,6 +220,7 @@ class ImportService:
         
         # Validar columnas
         columnas_requeridas = ['Id_Asignatura', 'NombreAsignatura', 'Semestre']
+
         columnas_faltantes = [
             col for col in columnas_requeridas 
             if col not in df.columns
@@ -270,11 +282,13 @@ class ImportService:
         Procesa archivo de registros académicos
         
         Formato esperado:
+        - Id_Registro (int)
         - Id_Estudiante (int)
         - Id_asignatura (int)
         - Nota1, Nota2, Nota3, Nota4 (float: 1.0-7.0)
-        - % de Asistencia (float: 0-100)
-        - % de Uso de plataforma (float: 0-100)
+        - porcentaje_asistencia (float: 0-100)
+        - porcentaje_uso_plataforma (float: 0-100)
+        - promedio_notas (float: 1.0-7.0)
         """
         resultado = {
             'importados': 0,
@@ -288,11 +302,16 @@ class ImportService:
             resultado['errores'].extend(errores)
             return resultado
         
+        if encoding:
+            resultado['advertencias'].append(f'Archivo leído con encoding: {encoding}')
+
         # Validar columnas
         columnas_requeridas = [
-            'Id_Estudiante', 'Id_asignatura',
+            'Id_Registro','Id_Estudiante', 'Id_asignatura',
             'Nota1', 'Nota2', 'Nota3', 'Nota4',
-            '% de Asistencia', '% de Uso de plataforma'
+            '% de Asistencia',     
+            '% de Uso de plataforma', 
+            'PromedioNotas'
         ]
         
         columnas_faltantes = [
@@ -314,13 +333,13 @@ class ImportService:
         with transaction.atomic():
             for index, row in df.iterrows():
                 try:
-                    # Validar IDs
-                    if pd.isna(row['Id_Estudiante']) or pd.isna(row['Id_asignatura']):
+                    if pd.isna(row['Id_Registro']) or pd.isna(row['Id_Estudiante']) or pd.isna(row['Id_asignatura']):
                         resultado['errores'].append(
-                            f'Fila {index + 2}: IDs vacíos'
+                            f'Fila {index + 2}: Datos incompletos'
                         )
                         continue
                     
+                    id_registro = int(row['Id_Registro'])
                     id_estudiante = int(row['Id_Estudiante'])
                     id_asignatura = int(row['Id_asignatura'])
                     
@@ -371,19 +390,30 @@ class ImportService:
                     
                     if not (0 <= asistencia <= 100):
                         resultado['advertencias'].append(
-                            f'Fila {index + 2}: Asistencia fuera de rango ({asistencia}%)'
+                            f'Fila {index + 2}: % de Asistencia fuera de rango ({asistencia}%)'
                         )
                         asistencia = max(0, min(100, asistencia))
                     
                     if not (0 <= uso_plataforma <= 100):
                         resultado['advertencias'].append(
-                            f'Fila {index + 2}: Uso plataforma fuera de rango ({uso_plataforma}%)'
+                            f'Fila {index + 2}: % de Uso de plataforma fuera de rango ({uso_plataforma}%)'
                         )
                         uso_plataforma = max(0, min(100, uso_plataforma))
                     
                     # Calcular promedio
-                    promedio = sum(notas) / len(notas)
-                    
+                    if pd.isna(row['PromedioNotas']):
+                        promedio_leido = 1.0 # Valor por defecto si está vacío
+                        resultado['advertencias'].append(
+                            f'Fila {index + 2}: PromedioNotas vacío, se usó 1.0'
+                        )
+                    else:
+                        promedio_leido = float(row['PromedioNotas'])
+                        if promedio_leido < 1.0 or promedio_leido > 7.0:
+                            resultado['advertencias'].append(
+                                f'Fila {index + 2}: PromedioNotas fuera de rango ({promedio_leido}), ajustado'
+                            )
+                            promedio_leido = max(1.0, min(7.0, promedio_leido))
+
                     # Crear o actualizar registro
                     registro, created = RegistroAcademico.objects.update_or_create(
                         estudiante=estudiante,
@@ -393,13 +423,17 @@ class ImportService:
                             'nota2': notas[1],
                             'nota3': notas[2],
                             'nota4': notas[3],
-                            'promedio': promedio,
-                            'asistencia': asistencia,
-                            'uso_plataforma': uso_plataforma
+                            'promedio_notas': promedio_leido,
+                            'porcentaje_asistencia': asistencia,
+                            'porcentaje_uso_plataforma': uso_plataforma
                         }
                     )
-                    
                     resultado['importados'] += 1
+
+                    if not created:
+                        resultado['advertencias'].append(
+                            f'Registro {id_registro} actualizado'
+                        )
                     
                 except Exception as e:
                     resultado['errores'].append(
@@ -408,51 +442,6 @@ class ImportService:
                     logger.error(f"Error en fila {index}: {str(e)}")
         
         return resultado
-    
-    @staticmethod
-    def importar_todo(archivo_estudiantes, archivo_asignaturas, archivo_registros):
-        """
-        Importa todos los archivos en el orden correcto
-        
-        🎓 APRENDIZAJE: El orden importa
-        1. Estudiantes y Asignaturas primero (independientes)
-        2. Registros al final (dependen de estudiantes y asignaturas)
-        
-        Returns:
-            dict: Resultado consolidado de todas las importaciones
-        """
-        resultado_total = {
-            'estudiantes': {},
-            'asignaturas': {},
-            'registros': {},
-            'exito': True
-        }
-        
-        # 1. Importar estudiantes
-        if archivo_estudiantes:
-            resultado_total['estudiantes'] = ImportService.procesar_estudiantes(
-                archivo_estudiantes
-            )
-            if resultado_total['estudiantes']['errores']:
-                resultado_total['exito'] = False
-        
-        # 2. Importar asignaturas
-        if archivo_asignaturas:
-            resultado_total['asignaturas'] = ImportService.procesar_asignaturas(
-                archivo_asignaturas
-            )
-            if resultado_total['asignaturas']['errores']:
-                resultado_total['exito'] = False
-        
-        # 3. Importar registros (solo si los anteriores fueron exitosos)
-        if archivo_registros and resultado_total['exito']:
-            resultado_total['registros'] = ImportService.procesar_registros(
-                archivo_registros
-            )
-            if resultado_total['registros']['errores']:
-                resultado_total['exito'] = False
-        
-        return resultado_total
     
     @staticmethod
     def validar_integridad_datos():

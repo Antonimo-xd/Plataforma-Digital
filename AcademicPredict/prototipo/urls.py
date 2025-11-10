@@ -9,32 +9,13 @@ from django.conf import settings
 from . import views
 
 # 🔧 VISTAS SECUNDARIAS (Solo las optimizadas)
-from .vistas.secondary_views import (
-    asignaturas_criticas,
-    alertas_usuario, 
-    verificar_sistema,
-)
+from .vistas.secondary_views import (asignaturas_criticas, alertas_usuario, verificar_sistema,)
 
 # 📊 APIs DEL DASHBOARD (Mantener todas)
-from .api.dashboard_api import (
-    api_datos_dashboard,
-    api_evolucion_anomalias,
-    api_tipos_anomalias,
-    api_datos_tiempo_real,
-    api_alertas_count,
-    api_distribucion_carrera,
-    api_registros_semestre,
-    api_probar_analisis,
-    api_estadisticas_distribucion,
-    api_estudiante_detalle,
-    api_exportar_datos_avanzado
-)
+from .api.dashboard_api import ( api_datos_dashboard, api_evolucion_anomalias, api_tipos_anomalias, api_datos_tiempo_real, api_alertas_count, api_distribucion_carrera, api_registros_semestre, api_estadisticas_distribucion, api_estudiante_detalle, api_exportar_datos_avanzado)
 
 # 📋 SERVICIOS DE REPORTES (Con nuevas funciones optimizadas)
-from .services.reports_service import (
-    exportar_reporte_derivaciones,
-    exportar_todas_anomalias
-)
+from .services.reports_service import ( exportar_reporte_derivaciones, exportar_todas_anomalias)
 
 # ================================================================
 # CONFIGURACIÓN DE URLs OPTIMIZADA
@@ -54,16 +35,25 @@ urlpatterns = [
     # ================================================================
     
     path('anomalias/', views.ListadoAnomaliasView.as_view(), name='listado_anomalias'),
-    path('anomalias/<int:pk>/', views.DetalleAnomaliaView.as_view(), name='detalle_anomalia'),
+    path('anomalias/<int:pk>/', views.detalle_anomalia, name='detalle_anomalia'),
     path('anomalias/<int:anomalia_id>/actualizar-estado/', views.actualizar_estado_anomalia, name='actualizar_estado_anomalia'),
+
+    # ================================================================
+    # 🔧 IMPORTAR DATOS
+    # ================================================================
+    
+    path('importar/', views.importar_datos, name='importar_datos_web'),
     
     # ================================================================
     # 🔧 CONFIGURACIÓN Y CRITERIOS
     # ================================================================
     
     path('criterios/', views.configuracion_criterios, name='configuracion_criterios'),
-    path('criterios/crear/', views.crear_criterio_anomalia, name='crear_criterio_anomalia'),
+    path('criterios/crear/', views.crear_criterio_anomalia, name='crear_criterio'),
+    path('criterios/<int:criterio_id>/', views.detalle_criterio, name='detalle_criterio'),
+    path('criterios/<int:criterio_id>/editar/', views.editar_criterio, name='editar_criterio'),
     path('criterios/<int:criterio_id>/ejecutar/', views.ejecutar_analisis, name='ejecutar_analisis'),
+    path('criterios/<int:criterio_id>/eliminar/', views.eliminar_criterio, name='eliminar_criterio'),
     
     # ================================================================
     # 🤝 GESTIÓN DE DERIVACIONES
@@ -109,9 +99,6 @@ urlpatterns = [
     
     # APIs para detalles específicos
     path('api/estudiante/<int:estudiante_id>/detalle/', api_estudiante_detalle, name='api_estudiante_detalle'),
-    
-    # APIs de desarrollo y testing (SOLO EN DEBUG)
-    path('api/probar-analisis/', api_probar_analisis, name='api_probar_analisis'),
     
     # APIs de exportación avanzada
     path('api/exportar-datos-avanzado/', api_exportar_datos_avanzado, name='api_exportar_datos_avanzado'),

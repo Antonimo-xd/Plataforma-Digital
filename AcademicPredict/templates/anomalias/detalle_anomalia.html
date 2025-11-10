@@ -23,7 +23,7 @@
                 <a href="{% url 'listado_anomalias' %}" class="btn btn-secondary">
                     <i class="fas fa-arrow-left me-2"></i>Volver al Listado
                 </a>
-                {% if user.rol == 'analista_cpa' %}
+                {% if user.rol == 'analista_cpa' or user.rol == 'admin'%}
                 <a href="{% url 'crear_derivacion' anomalia.id %}" class="btn btn-primary">
                     <i class="fas fa-share me-2"></i>Crear Derivación
                 </a>
@@ -49,7 +49,7 @@
                             {% endif %}
                         </p>
                     </div>
-                    {% if user.rol in 'analista_cpa,coordinador_cpa' %}
+                    {% if user.rol in 'analista_cpa,coordinador_cpa,admin' %}
                     <div>
                         <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalActualizarEstado">
                             <i class="fas fa-edit me-1"></i>Actualizar Estado
@@ -200,7 +200,7 @@
                     </button>
                 </div>
                 <div class="card-body">
-                    {% if registros_estudiante %}
+                    {% if registros_academicos %}
                     <div class="table-responsive">
                         <table class="table table-hover">
                             <thead>
@@ -217,7 +217,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for registro in registros_estudiante %}
+                                {% for registro in registros_academicos %}
                                 <tr>
                                     <td>
                                         <strong>{{ registro.asignatura.nombre }}</strong>
@@ -412,19 +412,22 @@ function inicializarGraficoEvolucion(datos) {
                 data: promedios,
                 borderColor: '#3498db',
                 backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                yAxisID: 'y'
+                yAxisID: 'y',
+                tension: 0.1
             }, {
                 label: 'Asistencia (%)',
                 data: asistencias,
                 borderColor: '#27ae60',
                 backgroundColor: 'rgba(39, 174, 96, 0.1)',
-                yAxisID: 'y1'
+                yAxisID: 'y1',
+                tension: 0.1
             }, {
                 label: 'Uso Plataforma (%)',
                 data: usoPlataforma,
                 borderColor: '#f39c12',
                 backgroundColor: 'rgba(243, 156, 18, 0.1)',
-                yAxisID: 'y1'
+                yAxisID: 'y1',
+                tension: 0.1
             }]
         },
         options: {

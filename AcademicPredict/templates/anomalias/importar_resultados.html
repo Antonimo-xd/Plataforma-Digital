@@ -48,14 +48,10 @@
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <div class="p-3 rounded bg-info text-white">
+                            <div class="p-3 rounded {% if total_advertencias > 0 %}bg-info{% else %}bg-secondary{% endif %} text-white">
                                 <i class="fas fa-info-circle fa-2x mb-2"></i>
-                                <h3 class="mb-0">
-                                    {% with advertencias_count=resultados.estudiantes.advertencias|length|add:resultados.asignaturas.advertencias|length|add:resultados.registros.advertencias|length %}
-                                        {{ advertencias_count }}
-                                    {% endwith %}
-                                </h3>
-                                <p class="mb-0">Advertencias</p>
+                                <h3 class="mb-0">{{total_advertencias}}</h3>
+                                <p class="mb-0">Total Advertencias</p>
                             </div>
                         </div>
                     </div>
@@ -347,7 +343,7 @@
                                 </div>
                             </div>
                         </div>
-                        {% endif %}
+                        {% endif %} 
 
                         <!-- Advertencias Asignaturas -->
                         {% if resultados.asignaturas.advertencias %}

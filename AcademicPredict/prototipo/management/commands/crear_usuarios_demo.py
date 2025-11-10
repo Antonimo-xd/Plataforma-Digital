@@ -23,26 +23,26 @@ class Command(BaseCommand):
                 'email': 'admin@universidad.cl',
                 'first_name': 'Administrador',
                 'last_name': 'Sistema',
-                'rol': 'coordinador_cpa',
+                'rol': 'admin',
                 'is_superuser': True,
                 'is_staff': True
             },
             {
-                'username': 'analista1',
+                'username': 'analista',
                 'email': 'analista@universidad.cl',
                 'first_name': 'María',
                 'last_name': 'González',
                 'rol': 'analista_cpa'
             },
             {
-                'username': 'coordinador1',
+                'username': 'coordinador',
                 'email': 'coordinador@universidad.cl',
                 'first_name': 'Juan',
                 'last_name': 'Pérez',
                 'rol': 'coordinador_cpa'
             },
             {
-                'username': 'coord_carrera1',
+                'username': 'coord_carrera',
                 'email': 'coord.carrera@universidad.cl',
                 'first_name': 'Ana',
                 'last_name': 'Martínez',
@@ -116,7 +116,7 @@ class Command(BaseCommand):
             self.style.SUCCESS('\n¡Usuarios y datos de demostración creados exitosamente!')
         )
         self.stdout.write('Credenciales de acceso:')
-        self.stdout.write('- admin / demo123 (Coordinador CPA)')
-        self.stdout.write('- analista1 / demo123 (Analista CPA)')
-        self.stdout.write('- coordinador1 / demo123 (Coordinador CPA)')
-        self.stdout.write('- coord_carrera1 / demo123 (Coordinador de Carrera)')
+        self.stdout.write('- admin / demo123 (Aministrador)')
+        self.stdout.write('- analista / demo123 (Analista CPA)')
+        self.stdout.write('- coordinador / demo123 (Coordinador CPA)')
+        self.stdout.write('- coord_carrera / demo123 (Coordinador de Carrera)')

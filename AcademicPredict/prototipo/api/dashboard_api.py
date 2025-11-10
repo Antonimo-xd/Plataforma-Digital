@@ -21,7 +21,7 @@ class DashboardAPI:
     """
     
     @staticmethod
-    def get_evolution_data(user, days=30):
+    def obtener_evolucion_datos(user, days=30):
         """
         Obtiene datos de evolución temporal de anomalías
         
@@ -36,7 +36,7 @@ class DashboardAPI:
             # Filtrar anomalías según permisos del usuario
             anomalias = DeteccionAnomalia.objects.all()
             
-            if user.rol == 'coordinador_carrera':
+            if user.rol == 'coordinador_carrera' or user.rol == 'admin':
                 try:
                     carrera = Carrera.objects.get(coordinador=user)
                     anomalias = anomalias.filter(estudiante__carrera=carrera)
@@ -75,12 +75,19 @@ class DashboardAPI:
                 'counts': [anomalias_por_fecha.get(fecha, 0) for fecha in fechas_completas],
                 'labels': [fecha.strftime('%d/%m') for fecha in fechas_completas]
             }
+
+            # Calculamos el promedio
+            total_anomalias_periodo = sum(evolution_data['counts'])
+            promedio_diario = round(total_anomalias_periodo / len(fechas_completas), 1)
+            
+            # Añadimos el promedio DENTRO del objeto evolution_data
+            evolution_data['promedio_diario'] = promedio_diario
             
             return {
                 'success': True,
                 'evolucion_temporal': evolution_data,
                 'total_periodo': sum(evolution_data['counts']),
-                'promedio_diario': round(sum(evolution_data['counts']) / len(fechas_completas), 1)
+                'promedio_diario': promedio_diario
             }
             
         except Exception as e:
@@ -92,7 +99,7 @@ class DashboardAPI:
             }
     
     @staticmethod
-    def get_anomaly_types_distribution(user):
+    def obtener_distribucion_tipos_de_anomalias(user):
         """
         Obtiene distribución de tipos de anomalías
         
@@ -106,7 +113,7 @@ class DashboardAPI:
             # Base queryset con filtros de permiso
             anomalias = DeteccionAnomalia.objects.all()
             
-            if user.rol == 'coordinador_carrera':
+            if user.rol == 'coordinador_carrera' or user.rol == 'admin':
                 try:
                     carrera = Carrera.objects.get(coordinador=user)
                     anomalias = anomalias.filter(estudiante__carrera=carrera)
@@ -143,7 +150,7 @@ class DashboardAPI:
             if total > 0:
                 for item in anomalias_por_tipo:
                     item['porcentaje'] = round((item['count'] / total) * 100, 1)
-            
+
             return {
                 'success': True,
                 'anomalias_por_tipo': anomalias_por_tipo,
@@ -151,7 +158,7 @@ class DashboardAPI:
             }
             
         except Exception as e:
-            print(f"❌ Error en get_anomaly_types_distribution: {str(e)}")
+            print(f"❌ Error en obtener_distribución_tipos_de_anomalías: {str(e)}")
             return {
                 'success': False,
                 'error': str(e),
@@ -159,7 +166,7 @@ class DashboardAPI:
             }
     
     @staticmethod
-    def get_real_time_stats(user):
+    def obtener_estadisticas_tiempo_real(user):
         """
         Obtiene estadísticas en tiempo real
         
@@ -176,7 +183,7 @@ class DashboardAPI:
             derivaciones_query = Derivacion.objects.all()
             
             # Filtrar por rol
-            if user.rol == 'coordinador_carrera':
+            if user.rol == 'coordinador_carrera' or user.rol == 'admin':
                 try:
                     carrera = Carrera.objects.get(coordinador=user)
                     estudiantes_query = estudiantes_query.filter(carrera=carrera)
@@ -202,7 +209,12 @@ class DashboardAPI:
             tasa_anomalias = 0
             if total_estudiantes > 0:
                 tasa_anomalias = round((anomalias_activas / total_estudiantes) * 100, 2)
-            
+
+            anomalias_mes_actual = anomalias_query.filter(
+                fecha_deteccion__month=timezone.now().month,
+                fecha_deteccion__year=timezone.now().year
+            ).count()
+
             return {
                 'success': True,
                 'stats': {
@@ -211,13 +223,14 @@ class DashboardAPI:
                     'anomalias_activas': anomalias_activas,
                     'anomalias_criticas': anomalias_criticas,
                     'derivaciones_pendientes': derivaciones_pendientes,
-                    'tasa_anomalias': tasa_anomalias
+                    'tasa_anomalias': tasa_anomalias,
+                    'anomalias_mes_actual': anomalias_mes_actual,
                 },
                 'timestamp': timezone.now().isoformat()
             }
             
         except Exception as e:
-            print(f"❌ Error en get_real_time_stats: {str(e)}")
+            print(f"❌ Error en obtener_estadísticas_tiempo_real: {str(e)}")
             return {
                 'success': False,
                 'error': str(e),
@@ -238,10 +251,10 @@ def api_datos_dashboard(request):
     """
     try:
         # Usar los métodos estáticos del servicio
-        evolution_data = DashboardAPI.get_evolution_data(request.user, 30)
-        types_data = DashboardAPI.get_anomaly_types_distribution(request.user)
-        stats_data = DashboardAPI.get_real_time_stats(request.user)
-        
+        evolution_data = DashboardAPI.obtener_evolucion_datos(request.user, 30)
+        types_data = DashboardAPI.obtener_distribucion_tipos_de_anomalias(request.user)
+        stats_data = DashboardAPI.obtener_estadisticas_tiempo_real(request.user)
+
         # Combinar resultados
         response_data = {
             'success': True,
@@ -270,7 +283,7 @@ def api_evolucion_anomalias(request):
     """
     try:
         dias = int(request.GET.get('dias', 30))
-        result = DashboardAPI.get_evolution_data(request.user, dias)
+        result = DashboardAPI.obtener_evolucion_datos(request.user, dias)
         
         if result['success']:
             # Formatear específicamente para Chart.js
@@ -306,7 +319,7 @@ def api_tipos_anomalias(request):
     🎯 API específica para distribución de tipos de anomalías
     """
     try:
-        result = DashboardAPI.get_anomaly_types_distribution(request.user)
+        result = DashboardAPI.obtener_distribucion_tipos_de_anomalias(request.user)
         
         if result['success']:
             # Formatear para gráfico de dona/pie
@@ -340,7 +353,7 @@ def api_datos_tiempo_real(request):
     ⏱️ API para datos en tiempo real (stats básicas)
     """
     try:
-        result = DashboardAPI.get_real_time_stats(request.user)
+        result = DashboardAPI.obtener_estadisticas_tiempo_real(request.user)
         return JsonResponse(result)
         
     except Exception as e:
@@ -363,7 +376,7 @@ def api_alertas_count(request):
         )
         
         # Filtrar por rol
-        if request.user.rol == 'coordinador_carrera':
+        if request.user.rol == 'coordinador_carrera' or request.user.rol == 'admin':
             try:
                 carrera = Carrera.objects.get(coordinador=request.user)
                 anomalias_criticas = anomalias_criticas.filter(estudiante__carrera=carrera)
@@ -374,7 +387,7 @@ def api_alertas_count(request):
         
         # Contar derivaciones pendientes (solo para analistas)
         derivaciones_pendientes = 0
-        if request.user.rol in ['analista_cpa', 'coordinador_cpa']:
+        if request.user.rol in ['analista_cpa', 'coordinador_cpa', 'admin']:
             derivaciones_pendientes = Derivacion.objects.filter(
                 estado='pendiente',
                 fecha_derivacion__gte=timezone.now() - timedelta(hours=48)
@@ -402,7 +415,7 @@ def api_distribucion_carrera(request):
     """
     try:
         # Solo coordinadores CPA pueden ver todas las carreras
-        if request.user.rol not in ['coordinador_cpa', 'analista_cpa']:
+        if request.user.rol not in ['coordinador_cpa', 'analista_cpa', 'admin']:
             return JsonResponse({'success': False, 'error': 'Sin permisos'}, status=403)
         
         # Obtener distribución por carrera
@@ -471,51 +484,6 @@ def api_registros_semestre(request):
         print(f"❌ Error en api_registros_semestre: {str(e)}")
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
-@login_required
-def api_probar_analisis(request):
-    """
-    🧪 API para probar análisis de ML en desarrollo
-    """
-    if request.method != 'POST':
-        return JsonResponse({'success': False, 'error': 'Método no permitido'}, status=405)
-    
-    # Solo coordinadores CPA pueden ejecutar pruebas
-    if request.user.rol != 'coordinador_cpa':
-        return JsonResponse({'success': False, 'error': 'Sin permisos'}, status=403)
-    
-    try:
-        # Obtener criterio activo para prueba
-        criterio = CriterioAnomalia.objects.filter(activo=True).first()
-        if not criterio:
-            return JsonResponse({
-                'success': False, 
-                'error': 'No hay criterios activos para probar'
-            })
-        
-        # Ejecutar análisis de prueba
-        print("🧪 Ejecutando análisis de prueba...")
-        resultado = ejecutar_deteccion_anomalias(criterio, request.user)
-        
-        if resultado['exitoso']:
-            return JsonResponse({
-                'success': True,
-                'resultados': {
-                    'anomalias_detectadas': resultado['anomalias_detectadas'],
-                    'total_estudiantes': resultado['total_estudiantes'],
-                    'tiempo_ejecucion': f"{resultado.get('tiempo_ejecucion', 0):.2f}s",
-                    'criterio_usado': criterio.nombre
-                }
-            })
-        else:
-            return JsonResponse({
-                'success': False,
-                'error': resultado['error']
-            })
-            
-    except Exception as e:
-        print(f"❌ Error en api_probar_analisis: {str(e)}")
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
-
 @login_required  
 def api_estadisticas_distribucion(request):
     """
@@ -533,7 +501,7 @@ def api_estadisticas_distribucion(request):
         }
         
         # Filtrar por rol si es necesario
-        if request.user.rol == 'coordinador_carrera':
+        if request.user.rol == 'coordinador_carrera' or request.user.rol == 'admin':
             try:
                 carrera = Carrera.objects.get(coordinador=request.user)
                 stats['estudiantes_activos'] = Estudiante.objects.filter(
@@ -573,7 +541,7 @@ def api_estudiante_detalle(request, estudiante_id):
         )
         
         # Verificar permisos
-        if request.user.rol == 'coordinador_carrera':
+        if request.user.rol == 'coordinador_carrera' or request.user.rol == 'admin':
             try:
                 carrera = Carrera.objects.get(coordinador=request.user)
                 if estudiante.carrera != carrera:

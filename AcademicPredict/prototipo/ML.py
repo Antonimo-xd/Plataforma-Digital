@@ -1,18 +1,15 @@
-from django.http import HttpResponse
-from django.shortcuts import redirect
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
-from sklearn.metrics import classification_report
 import time
-import json
-from datetime import timedelta
-from django.utils import timezone
-from django.db.models import Avg, Count, Max, Min, Q
 from .models import *
-from django.contrib import messages
+import logging
+from datetime import timedelta
+
+from .utils.helpers import determinar_nivel_criticidad, crear_alertas_automaticas
+
+logger = logging.getLogger(__name__)
 
 def ejecutar_deteccion_anomalias(criterio, usuario_ejecutor):
     """
@@ -46,7 +43,6 @@ def ejecutar_deteccion_anomalias(criterio, usuario_ejecutor):
                 'anomalias_detectadas': 0,
                 'total_estudiantes': len(datos_estudiantes)
             }
-        
         # 3. Guardar anomalías detectadas
         anomalias_guardadas = guardar_anomalias_detectadas(
             resultados_modelo, criterio, usuario_ejecutor
@@ -274,14 +270,10 @@ def ejecutar_isolation_forest_mejorado(datos_estudiantes, criterio):
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(df)
     
-    # Parámetros dinámicos basados en el tamaño de datos
+    # Parámetros dinámicos
     n_estudiantes = len(datos_estudiantes)
-    
-    # Contamination dinámico: entre 5% y 25%
     contamination = getattr(criterio, 'contamination_rate', 0.1)
     contamination = min(max(contamination, 0.05), 0.25)
-    
-    # Número de estimadores
     n_estimators = getattr(criterio, 'n_estimators', 100)
     n_estimators = min(max(n_estimators, 50), 200)
     
@@ -307,7 +299,7 @@ def ejecutar_isolation_forest_mejorado(datos_estudiantes, criterio):
         if scores_max != scores_min:
             scores_normalized = ((scores - scores_min) / (scores_max - scores_min)) * 100
         else:
-            scores_normalized = np.full(len(scores), 50.0)  # Valor neutro si todos son iguales
+            scores_normalized = np.full(len(scores), 50.0)
         
         print(f"🎯 Predicciones completadas. Anomalías detectadas: {np.sum(predicciones == -1)}")
         
@@ -321,9 +313,9 @@ def ejecutar_isolation_forest_mejorado(datos_estudiantes, criterio):
         if pred == -1:  # Es anomalía
             anomalia = {
                 'estudiante': datos_est['estudiante_obj'],
-                'estudiante_pk': datos_est['estudiante_pk'],  # 🔧 CORREGIDO
-                'estudiante_id': datos_est['estudiante_id'],  # 🔧 CORREGIDO
-                'score_anomalia': float(score),
+                'estudiante_pk': datos_est['estudiante_pk'],
+                'estudiante_id': datos_est['estudiante_id'], # Clave correcta
+                'score_anomalia': float(score),             # Clave correcta
                 'confianza': min(float(score) / 100.0, 1.0),
                 'promedio_general': datos_est['promedio_general'],
                 'asistencia_promedio': datos_est['asistencia_promedio'],
@@ -383,27 +375,27 @@ def determinar_tipo_anomalia(estudiante_data):
         print(f"⚠️ Error determinando tipo de anomalía: {str(e)}")
         return 'multiple'  # Tipo por defecto
 
+# ML.py
+
 def guardar_anomalias_detectadas(resultados_modelo, criterio, usuario_ejecutor):
     """
     Guarda las anomalías detectadas en la base de datos
     """
-    from .utils.helpers import determinar_nivel_criticidad, crear_alertas_automaticas
-    
     anomalias_guardadas = []
     
     for estudiante_data in resultados_modelo['anomalias']:
         try:
-            estudiante = Estudiante.objects.get(
-                id_estudiante=estudiante_data['id_estudiante']
-            )
-            
-            # ✅ Obtener nivel de criticidad (retorna texto)
+            # 1. ✅ CORRECCIÓN: Obtener el objeto Estudiante DIRECTAMENTE.
+            # No necesitamos 'id_estudiante' porque ya tenemos el objeto.
+            estudiante = estudiante_data['estudiante']
+
+            # 2. Obtener nivel de criticidad
             nivel_criticidad = determinar_nivel_criticidad(
                 estudiante, 
                 estudiante_data
             )
             
-            # Determinar prioridad numérica basada en criticidad
+            # 3. Determinar prioridad numérica
             if nivel_criticidad == 'alta':
                 prioridad = 5
             elif nivel_criticidad == 'media':
@@ -411,32 +403,46 @@ def guardar_anomalias_detectadas(resultados_modelo, criterio, usuario_ejecutor):
             else:  # baja
                 prioridad = 1
             
-            # Crear detección
+            # 4. ❌ BUG ELIMINADO: Ya no hay print() roto.
+
+            # 5. ✅ CORRECCIÓN: Usar 'score_anomalia' (que corregimos antes)
             deteccion = DeteccionAnomalia.objects.create(
-                estudiante=estudiante,
-                criterio_usado=criterio,
                 tipo_anomalia=estudiante_data['tipo_anomalia'],
-                score_anomalia=estudiante_data['anomaly_score'],
+                score_anomalia=estudiante_data['score_anomalia'],
                 confianza=estudiante_data['confianza'],
                 promedio_general=estudiante_data['promedio_general'],
                 asistencia_promedio=estudiante_data['asistencia_promedio'],
                 uso_plataforma_promedio=estudiante_data['uso_plataforma_promedio'],
                 variacion_notas=estudiante_data['variacion_notas'],
+                
                 prioridad=prioridad,
-                nivel_criticidad=nivel_criticidad,  # ✅ Agregar este campo
+
+                criterio_usado=criterio,
+                revisado_por=usuario_ejecutor,
+                estudiante=estudiante,  # <--- Usamos el objeto directamente
+                nivel_criticidad=nivel_criticidad,
             )
             
-            # Crear alertas si es crítica
+            # 6. Crear alertas si es crítica
             if nivel_criticidad == 'alta':
                 crear_alertas_automaticas(deteccion)
             
             anomalias_guardadas.append(deteccion)
             
-        except Estudiante.DoesNotExist:
-            logger.warning(f"Estudiante {estudiante_data['id_estudiante']} no encontrado")
+        except KeyError as e:
+            # Si ahora falla, será por otra clave (como 'score_anomalia')
+            logger.error(f"Error de clave guardando anomalía. Clave faltante: {str(e)}")
+            logger.error(f"  Datos de la anomalía que falló: {estudiante_data}")
+            import traceback
+            traceback.print_exc()
             continue
         except Exception as e:
-            logger.error(f"Error guardando anomalía: {str(e)}")
+            # Captura cualquier otro error
+            logger.error(f"Error genérico guardando anomalía para estudiante {estudiante_data.get('estudiante')}: {str(e)}")
+            import traceback
+            traceback.print_exc()
             continue
     
+    print(f"💾 Total anomalías guardadas: {len(anomalias_guardadas)}")
     return anomalias_guardadas
+

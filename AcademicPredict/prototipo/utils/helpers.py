@@ -36,8 +36,8 @@ def determinar_nivel_criticidad(estudiante, datos_anomalia=None):
         
         # Calcular métricas
         promedio_general = registros.aggregate(Avg('promedio_notas'))['promedio_notas__avg'] or 0
-        asistencia_promedio = registros.aggregate(Avg('asistencia'))['asistencia__avg'] or 0
-        uso_plataforma_promedio = registros.aggregate(Avg('uso_plataforma'))['uso_plataforma__avg'] or 0
+        asistencia_promedio = registros.aggregate(Avg('porcentaje_asistencia'))['porcentaje_asistencia__avg'] or 0
+        uso_plataforma_promedio = registros.aggregate(Avg('porcentaje_uso_plataforma'))['porcentaje_uso_plataforma__avg'] or 0
         
         # Calcular variación de notas
         notas_todas = []
@@ -125,25 +125,6 @@ def determinar_nivel_criticidad(estudiante, datos_anomalia=None):
 def crear_alertas_automaticas(deteccion_anomalia):
     """
     🚨 Crea alertas automáticas basadas en una detección de anomalía
-    
-    📚 EDUCATIVO: Las alertas automáticas son notificaciones que se generan
-    cuando se cumplen ciertas condiciones. Este patrón es común en sistemas
-    de monitoreo para notificar a los usuarios relevantes sin intervención manual.
-    
-    Tipos de alertas creadas:
-    - Nueva anomalía detectada (para todos los casos)
-    - Anomalía crítica (para casos de alta prioridad)
-    - Asignatura crítica (cuando una asignatura tiene muchas anomalías)
-    - Seguimiento vencido (para derivaciones sin seguimiento)
-    
-    Args:
-        deteccion_anomalia (DeteccionAnomalia): Instancia de la anomalía detectada
-        
-    Returns:
-        list: Lista de alertas creadas
-        
-    Raises:
-        Exception: Si hay problemas creando las alertas
     """
     try:
         print(f"🚨 Creando alertas para anomalía: {deteccion_anomalia.id}")
@@ -152,23 +133,8 @@ def crear_alertas_automaticas(deteccion_anomalia):
         estudiante = deteccion_anomalia.estudiante
         
         # ================================================================
-        # ALERTA 1: NUEVA ANOMALÍA DETECTADA (Siempre se crea)
-        # ================================================================
-        alerta_nueva = AlertaAutomatica.objects.create(
-            tipo='nueva_anomalia',
-            titulo=f'Nueva anomalía detectada: {estudiante.nombre}',
-            mensaje=f'Se detectó una anomalía de tipo "{deteccion_anomalia.get_tipo_anomalia_display()}" '
-                    f'para el estudiante {estudiante.nombre} de la carrera {estudiante.carrera.nombre}.',
-            deteccion_relacionada=deteccion_anomalia,
-            destinatario=None,  # Para todos los usuarios autorizados
-            activa=True,
-            fecha_creacion=timezone.now()
-        )
-        alertas_creadas.append(alerta_nueva)
-        print(f"✅ Alerta de nueva anomalía creada")
-        
-        # ================================================================
-        # ALERTA 2: ANOMALÍA CRÍTICA (Solo para casos de alta prioridad)
+        # ALERTA 2: ANOMALÍA CRÍTICA
+        # ✅ CORRECCIÓN: Se quitó el campo 'destinatario'
         # ================================================================
         if deteccion_anomalia.prioridad >= 4:  # Urgente o Crítica
             alerta_critica = AlertaAutomatica.objects.create(
@@ -180,7 +146,7 @@ def crear_alertas_automaticas(deteccion_anomalia):
                         f'Score: {deteccion_anomalia.score_anomalia:.3f}\n'
                         f'Confianza: {deteccion_anomalia.confianza:.1f}%',
                 deteccion_relacionada=deteccion_anomalia,
-                destinatario=None,
+                # destinatario=None,  <-- ESTE CAMPO NO EXISTE
                 activa=True,
                 fecha_creacion=timezone.now()
             )
@@ -188,17 +154,12 @@ def crear_alertas_automaticas(deteccion_anomalia):
             print(f"🚨 Alerta crítica creada para prioridad {deteccion_anomalia.prioridad}")
         
         # ================================================================
-        # ALERTA 3: ASIGNATURA CRÍTICA (Múltiples anomalías en misma asignatura)
+        # ALERTA 3: ASIGNATURA CRÍTICA
         # ================================================================
-        # 📚 EDUCATIVO: Verificamos si hay patrones a nivel de asignatura
-        # que puedan indicar problemas sistémicos (ej: profesor, metodología)
-        
-        # Obtener registros del estudiante para identificar asignaturas problemáticas
         registros_estudiante = RegistroAcademico.objects.filter(estudiante=estudiante)
         
         for registro in registros_estudiante:
             if registro.asignatura:
-                # Contar anomalías recientes en esta asignatura
                 anomalias_asignatura = DeteccionAnomalia.objects.filter(
                     estudiante__in=RegistroAcademico.objects.filter(
                         asignatura=registro.asignatura
@@ -206,9 +167,7 @@ def crear_alertas_automaticas(deteccion_anomalia):
                     fecha_deteccion__gte=timezone.now() - timedelta(days=30)
                 ).count()
                 
-                # Si hay más de 5 anomalías en la asignatura en el último mes
                 if anomalias_asignatura >= 5:
-                    # Verificar si ya existe una alerta similar reciente
                     alerta_existente = AlertaAutomatica.objects.filter(
                         tipo='asignatura_critica',
                         asignatura_relacionada=registro.asignatura,
@@ -216,6 +175,7 @@ def crear_alertas_automaticas(deteccion_anomalia):
                     ).exists()
                     
                     if not alerta_existente:
+                        # ✅ CORRECCIÓN: Se quitó el campo 'destinatario'
                         alerta_asignatura = AlertaAutomatica.objects.create(
                             tipo='asignatura_critica',
                             titulo=f'Asignatura crítica: {registro.asignatura.nombre}',
@@ -223,7 +183,7 @@ def crear_alertas_automaticas(deteccion_anomalia):
                                     f'{anomalias_asignatura} anomalías en los últimos 30 días. '
                                     f'Se recomienda revisar metodología y estrategias de enseñanza.',
                             asignatura_relacionada=registro.asignatura,
-                            destinatario=None,
+                            # destinatario=None,  <-- ESTE CAMPO NO EXISTE
                             activa=True,
                             fecha_creacion=timezone.now()
                         )
@@ -231,9 +191,8 @@ def crear_alertas_automaticas(deteccion_anomalia):
                         print(f"📚 Alerta de asignatura crítica creada: {registro.asignatura.nombre}")
         
         # ================================================================
-        # ALERTA 4: SEGUIMIENTO VENCIDO (Para derivaciones sin respuesta)
+        # ALERTA 4: SEGUIMIENTO VENCIDO
         # ================================================================
-        # 📚 EDUCATIVO: Verificamos derivaciones del estudiante que no han tenido seguimiento
         derivaciones_vencidas = Derivacion.objects.filter(
             deteccion_anomalia__estudiante=estudiante,
             estado__in=['enviada', 'recibida'],
@@ -242,6 +201,7 @@ def crear_alertas_automaticas(deteccion_anomalia):
         )
         
         for derivacion in derivaciones_vencidas:
+            # ✅ CORRECCIÓN: Se quitó 'destinatario' del .create() y se usó .add()
             alerta_seguimiento = AlertaAutomatica.objects.create(
                 tipo='seguimiento_vencido',
                 titulo=f'Seguimiento vencido: {estudiante.nombre}',
@@ -250,10 +210,15 @@ def crear_alertas_automaticas(deteccion_anomalia):
                         f'Fecha derivación: {derivacion.fecha_derivacion.strftime("%d/%m/%Y")}\n'
                         f'Estado actual: {derivacion.get_estado_display()}',
                 deteccion_relacionada=deteccion_anomalia,
-                destinatario=derivacion.derivado_por,  # Notificar al que hizo la derivación
+                # destinatario=derivacion.derivado_por,  <-- ESTE CAMPO NO EXISTE
                 activa=True,
                 fecha_creacion=timezone.now()
             )
+            
+            # Así se asigna un ManyToManyField después de crear el objeto
+            if derivacion.derivado_por:
+                alerta_seguimiento.destinatarios.add(derivacion.derivado_por)
+                
             alertas_creadas.append(alerta_seguimiento)
             print(f"⏰ Alerta de seguimiento vencido creada")
         
@@ -275,7 +240,7 @@ def crear_alertas_automaticas(deteccion_anomalia):
     except Exception as e:
         logger.error(f"Error creando alertas automáticas: {str(e)}")
         print(f"❌ Error creando alertas automáticas: {str(e)}")
-        raise
+        raise  # Vuelve a lanzar el error para que el try/except de 'guardar_anomalias' lo capture
 
 def detalle_derivacion_ajax(derivacion_id, usuario_solicitante):
     """
@@ -555,31 +520,31 @@ def enviar_notificaciones_email(alertas, deteccion_anomalia):
             asunto = f"🚨 CPA CRÍTICO - {asunto}"
         
         mensaje = f"""
-Sistema de Detección de Anomalías Académicas - CPA
+            Sistema de Detección de Anomalías Académicas - CPA
 
-Se ha detectado una nueva anomalía que requiere atención:
+            Se ha detectado una nueva anomalía que requiere atención:
 
-ESTUDIANTE: {estudiante.nombre}
-CARRERA: {estudiante.carrera.nombre}
-TIPO DE ANOMALÍA: {deteccion_anomalia.get_tipo_anomalia_display()}
-PRIORIDAD: {deteccion_anomalia.get_prioridad_display()}
-CONFIANZA: {deteccion_anomalia.confianza:.1f}%
-FECHA DETECCIÓN: {deteccion_anomalia.fecha_deteccion.strftime('%d/%m/%Y %H:%M')}
+            ESTUDIANTE: {estudiante.nombre}
+            CARRERA: {estudiante.carrera.nombre}
+            TIPO DE ANOMALÍA: {deteccion_anomalia.get_tipo_anomalia_display()}
+            PRIORIDAD: {deteccion_anomalia.prioridad}
+            CONFIANZA: {deteccion_anomalia.confianza:.1f}%
+            FECHA DETECCIÓN: {deteccion_anomalia.fecha_deteccion.strftime('%d/%m/%Y %H:%M')}
 
-ALERTAS GENERADAS:
-"""
+            ALERTAS GENERADAS:
+            """
         
         for alerta in alertas:
             mensaje += f"- {alerta.titulo}\n"
         
         mensaje += f"""
 
-Para más detalles, ingrese al sistema CPA:
-{settings.BASE_URL if hasattr(settings, 'BASE_URL') else 'http://localhost:8000'}
+            Para más detalles, ingrese al sistema CPA:
+            {settings.BASE_URL if hasattr(settings, 'BASE_URL') else 'http://localhost:8000'}
 
-Este es un mensaje automático del Sistema CPA.
-No responder a este email.
-"""
+            Este es un mensaje automático del Sistema CPA.
+            No responder a este email.
+            """
         
         # Enviar email
         send_mail(

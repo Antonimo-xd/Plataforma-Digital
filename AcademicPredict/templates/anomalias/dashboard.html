@@ -70,7 +70,7 @@
     border-radius: 10px 10px 0 0 !important;
     padding: 1rem 1.25rem;
 }
- 
+
 .card-header h5 {
     color: #5a5c69;
     font-weight: 600;
@@ -287,7 +287,7 @@
                 </div>
             </div>
         </div>
- 
+
         <!-- Asignaturas críticas -->
         <div class="col-lg-6 mb-4">
             <div class="card">
@@ -321,7 +321,7 @@
                             <a href="{% url 'asignaturas_criticas' %}" class="btn btn-outline-danger btn-sm">
                                 Ver análisis de mi carrera
                             </a>
-                        {% elif usuario_rol == 'coordinador_cpa' or usuario_rol == 'analista_cpa' %}
+                        {% elif usuario_rol == 'coordinador_cpa' or usuario_rol == 'analista_cpa' or usuario_rol == 'admin' %}
                             <a href="{% url 'asignaturas_criticas' %}" class="btn btn-outline-danger btn-sm">
                                 Ver análisis completo
                             </a>
@@ -375,12 +375,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Función para actualizar estadísticas de evolución
-    function actualizarEstadisticasEvolucion(estadisticas) {
+    function actualizarEstadisticasEvolucion(estadisticas,evolucion_temporal) {
         const elemento = document.getElementById('estadisticasEvolucion');
         elemento.innerHTML = `
             Total: ${estadisticas.total_anomalias} anomalías | 
             Este mes: ${estadisticas.anomalias_mes_actual} | 
-            Promedio diario: ${estadisticas.promedio_diario}
+            Promedio diario: ${evolucion_temporal.promedio_diario}
         `;
     }
     
@@ -389,7 +389,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const elemento = document.getElementById('estadisticasTipos');
         const total = data.reduce((sum, item) => sum + item.count, 0);
         elemento.innerHTML = `Total: ${total} anomalías en ${data.length} tipos diferentes`;
-    }
+    } 
     
     // Cargar datos del dashboard
     fetch('/cpa/api/datos-dashboard/')
@@ -471,7 +471,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             // Actualizar estadísticas de evolución
-            actualizarEstadisticasEvolucion(data.estadisticas);
+            actualizarEstadisticasEvolucion(data.estadisticas, data.evolucion_temporal);
             
             // 2. GRÁFICO DE TIPOS DE ANOMALÍAS
             const ctxTipos = document.getElementById('chartTipos').getContext('2d');

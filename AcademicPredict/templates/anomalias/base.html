@@ -223,7 +223,6 @@
                     <small class="text-muted">{{ user.get_rol_display }}</small>
                 </div>
             </div>
-            
             <!-- Alertas no leídas -->
             {% if user.is_authenticated %}
             <div class="alert alert-info py-2 px-3 small">
@@ -241,7 +240,7 @@
                 </a>
             </li>
             
-            {% if user.rol == 'analista_cpa' or user.rol == 'coordinador_cpa' %}
+            {% if user.rol == 'analista_cpa' or user.rol == 'coordinador_cpa' or user.rol == 'admin' %}
             <li class="nav-item">
                 <a class="nav-link {% if 'anomalias' in request.resolver_match.url_name %}active{% endif %}" 
                     href="{% url 'listado_anomalias' %}">
@@ -264,7 +263,7 @@
             </li>
             {% endif %}
             
-            {% if user.rol == 'coordinador_cpa' %}
+            {% if user.rol == 'coordinador_cpa' or user.rol == 'admin' %}
             <!-- Sección de Configuración -->
             <li class="nav-item mt-3">
                 <hr class="dropdown-divider" style="border-color: rgba(255,255,255,0.2);">
@@ -273,14 +272,14 @@
             
             <li class="nav-item">
                 <a class="nav-link {% if 'criterios' in request.resolver_match.url_name %}active{% endif %}" 
-                    href="{#{% url 'configuracion_criterios' %}#}">
+                    href="{% url 'configuracion_criterios' %}">
                     <i class="fas fa-cogs me-2"></i>Criterios de Detección
                 </a>
             </li>
             
             <li class="nav-item">
                 <a class="nav-link {% if 'importar-datos' in request.resolver_match.url_name %}active{% endif %}" 
-                    href="{#{% url 'importar_datos_web' %}#}">
+                    href="{% url 'importar_datos_web' %}">
                     <i class="fas fa-cloud-upload-alt me-2"></i>Importar Datos
                 </a>
             </li>
@@ -292,7 +291,7 @@
             </li>
             {% endif %}
             
-            {% if user.rol == 'coordinador_carrera' %}
+            {% if user.rol == 'coordinador_carrera' or user.rol == 'admin' %}
             <li class="nav-item">
                 <a class="nav-link {% if 'asignaturas_criticas' in request.resolver_match.url_name %}active{% endif %}" 
                     href="{% url 'asignaturas_criticas' %}">
@@ -331,7 +330,7 @@
             </li>
         </ul>
     </nav>
- 
+
     <!-- Main Content -->
     <div class="main-content">
         <!-- Top Navbar -->
@@ -379,7 +378,7 @@
                             <li><hr class="dropdown-divider"></li>
                             
                             <!-- Acciones rápidas según el rol -->
-                            {% if user.rol == 'coordinador_cpa' %}
+                            {% if user.rol == 'coordinador_cpa' or user.rol == 'admin' %}
                             <li>
                                 <a class="dropdown-item" href="{% url 'configuracion_criterios' %}">
                                     <i class="fas fa-cogs me-2"></i>Configurar Criterios
@@ -387,7 +386,7 @@
                             </li>
                             {% endif %}
                             
-                            {% if user.rol in 'analista_cpa,coordinador_cpa' %}
+                            {% if user.rol in 'analista_cpa,coordinador_cpa' or user.rol == 'admin' %}
                             <li>
                                 <a class="dropdown-item" href="{% url 'gestionar_derivaciones' %}">
                                     <i class="fas fa-share-alt me-2"></i>Gestionar Derivaciones
@@ -395,7 +394,7 @@
                             </li>
                             {% endif %}
                             
-                            {% if user.rol == 'coordinador_carrera' %}
+                            {% if user.rol == 'coordinador_carrera' or user.rol == 'admin' %}
                             <li>
                                 <a class="dropdown-item" href="{% url 'asignaturas_criticas' %}">
                                     <i class="fas fa-fire me-2"></i>Asignaturas Críticas
@@ -519,17 +518,23 @@ setInterval(actualizarContadorAlertas, 30000);
                                 <tr>
                                     <td>admin</td>
                                     <td>Administrador Sistema</td>
+                                    <td><span class="badge bg-danger">Admin</span></td>
+                                    <td><span class="badge bg-success">Activo</span></td>
+                                </tr>
+                                <tr>
+                                    <td>coordinador</td>
+                                    <td>Juan Pérez</td>
                                     <td><span class="badge bg-primary">Coordinador CPA</span></td>
                                     <td><span class="badge bg-success">Activo</span></td>
                                 </tr>
                                 <tr>
-                                    <td>analista1</td>
+                                    <td>analista</td>
                                     <td>María González</td>
                                     <td><span class="badge bg-info">Analista CPA</span></td>
                                     <td><span class="badge bg-success">Activo</span></td>
                                 </tr>
                                 <tr>
-                                    <td>coord_carrera1</td>
+                                    <td>coord_carrera</td>
                                     <td>Ana Martínez</td>
                                     <td><span class="badge bg-warning">Coordinador Carrera</span></td>
                                     <td><span class="badge bg-success">Activo</span></td>

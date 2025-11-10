@@ -1,5 +1,3 @@
-from django.contrib.auth.decorators import user_passes_test
-
 def es_coordinador_cpa(user):
     """Verifica si el usuario es Coordinador CPA"""
     return user.is_authenticated and user.rol == 'coordinador_cpa'
