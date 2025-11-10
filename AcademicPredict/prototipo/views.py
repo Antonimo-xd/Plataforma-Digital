@@ -6,9 +6,7 @@ from django.http import JsonResponse, HttpResponse
 from django.core.paginator import Paginator
 from django.db.models import Q, Count, Avg, Max, Min
 from django.utils import timezone
-from django.views.generic import ListView, DetailView
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.urls import reverse  
+from django.urls import reverse
 from datetime import datetime
 import traceback
 import json
@@ -1015,173 +1013,176 @@ def eliminar_criterio(request, criterio_id):
         messages.error(request, f'Error eliminando criterio: {str(e)}')
         return redirect('configuracion_criterios')
 
-class ListadoAnomaliasView(LoginRequiredMixin, UserPassesTestMixin, ListView):
+@login_required
+@user_passes_test(lambda u: u.rol in ['analista_cpa', 'coordinador_cpa', 'coordinador_carrera', 'admin'])
+def listado_anomalias(request):
     """
     Lista paginada de anomalías con filtros
-    
-    🎓 APRENDIZAJE: ListView de Django
-    - Paginación automática
+
+    🎓 APRENDIZAJE: Función basada en vista (convertida desde ListView)
+    - Paginación manual
     - Ordenamiento
     - Filtros personalizados
     """
-    model = DeteccionAnomalia
-    template_name = 'anomalias/listado_anomalias.html'
-    context_object_name = 'anomalias'
-    paginate_by = 20
+    print(f"\n📊 listado_anomalias - Usuario: {request.user.username} ({request.user.rol})")
 
-    def test_func(self):
-        return self.request.user.rol in ['analista_cpa', 'coordinador_cpa', 'coordinador_carrera','admin']
+    # ================================================================
+    # QUERYSET BASE CON OPTIMIZACIÓN
+    # ================================================================
+    queryset = DeteccionAnomalia.objects.select_related(
+        'estudiante', 'estudiante__carrera', 'criterio_usado', 'revisado_por'
+    ).order_by('-fecha_deteccion')
 
-    def get_paginate_by(self, queryset):
-        """
-        Permite cambiar el número de elementos por página dinámicamente.
-        """
-        per_page = self.request.GET.get('per_page', '20')
+    # ================================================================
+    # FILTRAR POR ROL DEL USUARIO
+    # ================================================================
+    if request.user.rol == 'coordinador_carrera':
         try:
-            per_page = int(per_page)
-            # Limitar entre 10 y 100 elementos por página
-            if 10 <= per_page <= 100:
-                return per_page
-        except (ValueError, TypeError):
-            pass
-        return self.paginate_by
+            carrera = Carrera.objects.get(coordinador=request.user)
+            queryset = queryset.filter(estudiante__carrera=carrera)
+            print(f"👨‍🎓 Filtrando por carrera: {carrera.nombre}")
+        except Carrera.DoesNotExist:
+            print("❌ Coordinador sin carrera asignada")
+            queryset = queryset.none()
 
-    def get_queryset(self):
-        """Queryset con filtros mejorados y debug."""
-        print(f"\n📊 ListadoAnomaliasView - Usuario: {self.request.user.username} ({self.request.user.rol})")
-        
-        # Queryset base
-        queryset = DeteccionAnomalia.objects.select_related(
-            'estudiante', 'estudiante__carrera', 'criterio_usado', 'revisado_por'
-        ).order_by('-fecha_deteccion')
-        
-        # Filtrar por rol del usuario
-        if self.request.user.rol == 'coordinador_carrera':
-            try:
-                carrera = Carrera.objects.get(coordinador=self.request.user)
-                queryset = queryset.filter(estudiante__carrera=carrera)
-                print(f"👨‍🎓 Filtrando por carrera: {carrera.nombre}")
-            except Carrera.DoesNotExist:
-                print("❌ Coordinador sin carrera asignada")
-                queryset = queryset.none()
-        
-        # APLICAR FILTROS DE BÚSQUEDA
-        
-        # 1. Filtro por estado
-        estado = self.request.GET.get('estado')
-        if estado:
-            queryset = queryset.filter(estado=estado)
-            print(f"🔍 Filtro estado: {estado}")
-        
-        # 2. Filtro por tipo de anomalía
-        tipo = self.request.GET.get('tipo')
-        if tipo:
-            queryset = queryset.filter(tipo_anomalia=tipo)
-            print(f"🔍 Filtro tipo: {tipo}")
-        
-        # 3. Filtro por prioridad
-        prioridad = self.request.GET.get('prioridad')
-        if prioridad:
-            try:
-                prioridad_int = int(prioridad)
-                queryset = queryset.filter(prioridad=prioridad_int)
-                print(f"🔍 Filtro prioridad: {prioridad_int}")
-            except ValueError:
-                pass
-        
-        # 4. Filtro por carrera (para coordinadores CPA)
-        carrera_filtro = self.request.GET.get('carrera')
-        if carrera_filtro and self.request.user.rol in ['coordinador_cpa', 'analista_cpa']:
-            try:
-                carrera_obj = Carrera.objects.get(id=carrera_filtro)
-                queryset = queryset.filter(estudiante__carrera=carrera_obj)
-                print(f"🔍 Filtro carrera: {carrera_obj.nombre}")
-            except Carrera.DoesNotExist:
-                pass
-        
-        # 5. Filtro por rango de fechas
-        fecha_desde = self.request.GET.get('fecha_desde')
-        fecha_hasta = self.request.GET.get('fecha_hasta')
-        
-        if fecha_desde:
-            try:
-                from datetime import datetime
-                fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
-                queryset = queryset.filter(fecha_deteccion__date__gte=fecha_desde_obj)
-                print(f"🔍 Filtro fecha desde: {fecha_desde}")
-            except ValueError:
-                print(f"❌ Fecha desde inválida: {fecha_desde}")
-        
-        if fecha_hasta:
-            try:
-                from datetime import datetime
-                fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
-                queryset = queryset.filter(fecha_deteccion__date__lte=fecha_hasta_obj)
-                print(f"🔍 Filtro fecha hasta: {fecha_hasta}")
-            except ValueError:
-                print(f"❌ Fecha hasta inválida: {fecha_hasta}")
-        
-        # 6. Filtro por nombre de estudiante
-        buscar = self.request.GET.get('buscar')
-        if buscar:
-            queryset = queryset.filter(
-                Q(estudiante__nombre__icontains=buscar) |
-                Q(estudiante__id_estudiante__icontains=buscar)
-            )
-            print(f"🔍 Búsqueda: {buscar}")
-        
-        # 7. Ordenamiento
-        orden = self.request.GET.get('orden', '-fecha_deteccion')
-        if orden in ['-fecha_deteccion', 'fecha_deteccion', '-score_anomalia', 'score_anomalia', 
-                        'estudiante__nombre', '-estudiante__nombre', '-prioridad', 'prioridad']:
-            queryset = queryset.order_by(orden)
-            print(f"📋 Ordenamiento: {orden}")
-        
-        print(f"📊 Total anomalías después de filtros: {queryset.count()}")
-        return queryset
-    
-    def get_context_data(self, **kwargs):
-        """Añadir datos adicionales al contexto."""
-        context = super().get_context_data(**kwargs)
-        
-        # Obtener parámetros actuales para mantener filtros en paginación
-        filtros_actuales = {
-            'estado': self.request.GET.get('estado', ''),
-            'tipo': self.request.GET.get('tipo', ''),
-            'prioridad': self.request.GET.get('prioridad', ''),
-            'carrera': self.request.GET.get('carrera', ''),
-            'fecha_desde': self.request.GET.get('fecha_desde', ''),
-            'fecha_hasta': self.request.GET.get('fecha_hasta', ''),
-            'buscar': self.request.GET.get('buscar', ''),
-            'orden': self.request.GET.get('orden', '-fecha_deteccion'),
-            'per_page': self.request.GET.get('per_page', '20')
-        }
-        
-        # Opciones para los filtros
-        estados_choices = DeteccionAnomalia.ESTADOS
-        tipos_choices = DeteccionAnomalia.TIPOS_ANOMALIA
-        
-        # Carreras disponibles (solo para coordinadores CPA)
-        carreras_disponibles = []
-        if self.request.user.rol in ['coordinador_cpa', 'analista_cpa']:
-            carreras_disponibles = Carrera.objects.all().order_by('nombre')
-        
-        # Estadísticas rápidas
-        total_anomalias = self.get_queryset().count()
-        
-        # Agregar al contexto
-        context.update({
-            'filtros_actuales': filtros_actuales,
-            'estados_choices': estados_choices,
-            'tipos_choices': tipos_choices,
-            'carreras_disponibles': carreras_disponibles,
-            'total_anomalias': total_anomalias,
-            'usuario_rol': self.request.user.rol,
-            'request': self.request,  # Para usar en templates
-        })
-        
-        print(f"📋 Context data preparado - Total anomalías: {total_anomalias}")
-        return context
+    # ================================================================
+    # APLICAR FILTROS DE BÚSQUEDA
+    # ================================================================
+
+    # 1. Filtro por estado
+    estado = request.GET.get('estado')
+    if estado:
+        queryset = queryset.filter(estado=estado)
+        print(f"🔍 Filtro estado: {estado}")
+
+    # 2. Filtro por tipo de anomalía
+    tipo = request.GET.get('tipo')
+    if tipo:
+        queryset = queryset.filter(tipo_anomalia=tipo)
+        print(f"🔍 Filtro tipo: {tipo}")
+
+    # 3. Filtro por prioridad
+    prioridad = request.GET.get('prioridad')
+    if prioridad:
+        try:
+            prioridad_int = int(prioridad)
+            queryset = queryset.filter(prioridad=prioridad_int)
+            print(f"🔍 Filtro prioridad: {prioridad_int}")
+        except ValueError:
+            pass
+
+    # 4. Filtro por carrera (para coordinadores CPA)
+    carrera_filtro = request.GET.get('carrera')
+    if carrera_filtro and request.user.rol in ['coordinador_cpa', 'analista_cpa']:
+        try:
+            carrera_obj = Carrera.objects.get(id=carrera_filtro)
+            queryset = queryset.filter(estudiante__carrera=carrera_obj)
+            print(f"🔍 Filtro carrera: {carrera_obj.nombre}")
+        except Carrera.DoesNotExist:
+            pass
+
+    # 5. Filtro por rango de fechas
+    fecha_desde = request.GET.get('fecha_desde')
+    fecha_hasta = request.GET.get('fecha_hasta')
+
+    if fecha_desde:
+        try:
+            from datetime import datetime
+            fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+            queryset = queryset.filter(fecha_deteccion__date__gte=fecha_desde_obj)
+            print(f"🔍 Filtro fecha desde: {fecha_desde}")
+        except ValueError:
+            print(f"❌ Fecha desde inválida: {fecha_desde}")
+
+    if fecha_hasta:
+        try:
+            from datetime import datetime
+            fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+            queryset = queryset.filter(fecha_deteccion__date__lte=fecha_hasta_obj)
+            print(f"🔍 Filtro fecha hasta: {fecha_hasta}")
+        except ValueError:
+            print(f"❌ Fecha hasta inválida: {fecha_hasta}")
+
+    # 6. Filtro por nombre de estudiante
+    buscar = request.GET.get('buscar')
+    if buscar:
+        queryset = queryset.filter(
+            Q(estudiante__nombre__icontains=buscar) |
+            Q(estudiante__id_estudiante__icontains=buscar)
+        )
+        print(f"🔍 Búsqueda: {buscar}")
+
+    # 7. Ordenamiento
+    orden = request.GET.get('orden', '-fecha_deteccion')
+    if orden in ['-fecha_deteccion', 'fecha_deteccion', '-score_anomalia', 'score_anomalia',
+                    'estudiante__nombre', '-estudiante__nombre', '-prioridad', 'prioridad']:
+        queryset = queryset.order_by(orden)
+        print(f"📋 Ordenamiento: {orden}")
+
+    print(f"📊 Total anomalías después de filtros: {queryset.count()}")
+
+    # ================================================================
+    # PAGINACIÓN DINÁMICA
+    # ================================================================
+    per_page = request.GET.get('per_page', '20')
+    try:
+        per_page = int(per_page)
+        # Limitar entre 10 y 100 elementos por página
+        if not (10 <= per_page <= 100):
+            per_page = 20
+    except (ValueError, TypeError):
+        per_page = 20
+
+    paginator = Paginator(queryset, per_page)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    # ================================================================
+    # PREPARAR CONTEXTO
+    # ================================================================
+
+    # Obtener parámetros actuales para mantener filtros en paginación
+    filtros_actuales = {
+        'estado': request.GET.get('estado', ''),
+        'tipo': request.GET.get('tipo', ''),
+        'prioridad': request.GET.get('prioridad', ''),
+        'carrera': request.GET.get('carrera', ''),
+        'fecha_desde': request.GET.get('fecha_desde', ''),
+        'fecha_hasta': request.GET.get('fecha_hasta', ''),
+        'buscar': request.GET.get('buscar', ''),
+        'orden': request.GET.get('orden', '-fecha_deteccion'),
+        'per_page': request.GET.get('per_page', '20')
+    }
+
+    # Opciones para los filtros
+    estados_choices = DeteccionAnomalia.ESTADOS
+    tipos_choices = DeteccionAnomalia.TIPOS_ANOMALIA
+
+    # Carreras disponibles (solo para coordinadores CPA)
+    carreras_disponibles = []
+    if request.user.rol in ['coordinador_cpa', 'analista_cpa']:
+        carreras_disponibles = Carrera.objects.all().order_by('nombre')
+
+    # Estadísticas rápidas
+    total_anomalias = queryset.count()
+
+    # Contexto completo
+    context = {
+        'anomalias': page_obj,  # Django espera 'object_list' o el nombre personalizado
+        'page_obj': page_obj,
+        'paginator': paginator,
+        'is_paginated': page_obj.has_other_pages(),
+        'filtros_actuales': filtros_actuales,
+        'estados_choices': estados_choices,
+        'tipos_choices': tipos_choices,
+        'carreras_disponibles': carreras_disponibles,
+        'total_anomalias': total_anomalias,
+        'usuario_rol': request.user.rol,
+    }
+
+    print(f"📋 Context data preparado - Total anomalías: {total_anomalias}")
+
+    return render(request, 'anomalias/listado_anomalias.html', context)
 
 @login_required
 @user_passes_test(lambda u: u.rol in ['analista_cpa', 'coordinador_cpa', 'coordinador_carrera', 'admin'])

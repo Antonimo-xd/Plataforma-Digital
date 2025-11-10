@@ -31,10 +31,10 @@ urlpatterns = [
     path('', views.dashboard, name='dashboard'),
     
     # ================================================================
-    # 📋 GESTIÓN DE ANOMALÍAS (Core functionality)  
+    # 📋 GESTIÓN DE ANOMALÍAS (Core functionality)
     # ================================================================
-    
-    path('anomalias/', views.ListadoAnomaliasView.as_view(), name='listado_anomalias'),
+
+    path('anomalias/', views.listado_anomalias, name='listado_anomalias'),
     path('anomalias/<int:pk>/', views.detalle_anomalia, name='detalle_anomalia'),
     path('anomalias/<int:anomalia_id>/actualizar-estado/', views.actualizar_estado_anomalia, name='actualizar_estado_anomalia'),
 
