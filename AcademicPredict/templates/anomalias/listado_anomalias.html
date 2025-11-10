@@ -190,11 +190,11 @@
                                                 <i class="fas fa-eye"></i>
                                             </a>
                                             {% if user.rol == 'analista_cpa' or user.rol == 'admin' %}
-                                            <a href="{% url 'crear_derivacion' anomalia.id %}" 
-                                            class="btn btn-outline-success btn-sm" 
-                                            title="Crear derivación">
+                                            <button onclick="derivarIndividual({{ anomalia.id }})"
+                                            class="btn btn-outline-success btn-sm"
+                                            title="Derivar esta anomalía">
                                                 <i class="fas fa-share"></i>
-                                            </a>
+                                            </button>
                                             {% endif %}
                                         </div>
                                     </td>
@@ -418,7 +418,7 @@
                 <h5 class="modal-title">Cambiar Estado Masivo</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form id="formCambiarEstado" method="post" action="#">
+            <form id="formCambiarEstado" method="post" action="{% url 'gestion_masiva_anomalias' %}">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="cambiar_estado">
                 <div class="modal-body">
@@ -451,7 +451,7 @@
                 <h5 class="modal-title">Derivar Anomalías</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form id="formDerivarMasivo" method="post" action="#">
+            <form id="formDerivarMasivo" method="post" action="{% url 'gestion_masiva_anomalias' %}">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="derivar_masivo">
                 <div class="modal-body">
@@ -739,6 +739,34 @@ function derivarMasivo() {
         input.value = id;
         form.appendChild(input);
     });
+
+    // Mostrar modal
+    const modal = new bootstrap.Modal(document.getElementById('derivarMasivoModal'));
+    modal.show();
+}
+
+// Derivar una anomalía individual
+function derivarIndividual(anomaliaId) {
+    const cantidadElement = document.getElementById('cantidadSeleccionadasDerivar');
+    if (cantidadElement) {
+        cantidadElement.textContent = 1;
+    }
+
+    // Agregar ID al formulario
+    const form = document.getElementById('formDerivarMasivo');
+    if (!form) return;
+
+    // Limpiar inputs anteriores
+    form.querySelectorAll('input[name="anomalias_seleccionadas"]').forEach(input => {
+        input.remove();
+    });
+
+    // Agregar el ID de la anomalía individual
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'anomalias_seleccionadas';
+    input.value = anomaliaId;
+    form.appendChild(input);
 
     // Mostrar modal
     const modal = new bootstrap.Modal(document.getElementById('derivarMasivoModal'));

@@ -1578,15 +1578,19 @@ def detalle_anomalia(request, pk):
     
     estados = DeteccionAnomalia.ESTADOS
 
+    # Obtener instancias de apoyo activas para el modal de derivación
+    instancias_apoyo = InstanciaApoyo.objects.filter(activo=True).order_by('nombre')
+
     evolucion_datos = json.dumps(evolucion_datos)
 
     # 4. Creamos el diccionario de 'context' manualmente
     context = {
-        'anomalia': anomalia, 
+        'anomalia': anomalia,
         'registros_academicos': registros_estudiante,
         'derivaciones': derivaciones,
         'evolucion_datos': evolucion_datos,
         'estados': estados,
+        'instancias_apoyo': instancias_apoyo,
     }
 
     # 5. Renderizamos el 'template_name' con el 'context'
