@@ -205,7 +205,7 @@ class DeteccionAnomalia(models.Model):
     
     def puede_ser_derivada(self):
         """Verifica si la anomalía puede ser derivada"""
-        return self.estado in ['en_revision', 'detectado']
+        return self.estado in ['detectado', 'en_revision', 'intervencion_activa']
     
     def es_critica(self):
         """Verifica si la anomalía es de nivel crítico"""

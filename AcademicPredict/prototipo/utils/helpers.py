@@ -664,11 +664,16 @@ def _calcular_asignaturas_criticas():
 
 def _obtener_estadisticas_sistema():
     """Obtiene estadísticas básicas del sistema"""
+    anomalias_activas = DeteccionAnomalia.objects.filter(
+        estado__in=['detectado', 'en_revision', 'intervencion_activa']
+    ).count()
+
     return {
         'estudiantes_activos': Estudiante.objects.filter(activo=True).count(),
         'registros_academicos': RegistroAcademico.objects.count(),
         'criterios_activos': CriterioAnomalia.objects.filter(activo=True).count(),
         'anomalias_total': DeteccionAnomalia.objects.count(),
+        'anomalias_activas': anomalias_activas,
         'anomalias_pendientes': DeteccionAnomalia.objects.filter(
             estado__in=['detectado', 'en_revision']
         ).count()

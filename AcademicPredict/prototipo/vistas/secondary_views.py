@@ -41,17 +41,30 @@ def asignaturas_criticas(request):
 def verificar_sistema(request):
     """
     Vista simplificada para verificación del sistema
-    
+
     🎓 EDUCATIVO: Dashboard de salud del sistema enfocado
     en métricas clave, no en detalles técnicos.
     """
     stats = _obtener_estadisticas_sistema()
-    
+    estado_sistema = _determinar_estado_sistema(stats)
+
+    # Detectar problemas específicos
+    problemas = []
+    if stats.get('criterios_activos', 0) == 0:
+        problemas.append('No hay criterios activos configurados')
+    if stats.get('estudiantes_activos', 0) < 10:
+        problemas.append('Muy pocos estudiantes activos en el sistema')
+    if stats.get('registros_academicos', 0) < 30:
+        problemas.append('Insuficientes registros académicos para análisis')
+    if stats.get('anomalias_pendientes', 0) > stats.get('anomalias_total', 1) * 0.8:
+        problemas.append('Muchas anomalías pendientes de revisión')
+
     context = {
         'stats': stats,
-        'estado_general': _determinar_estado_sistema(stats)
+        'estado_general': estado_sistema.get('estado', 'unknown'),
+        'problemas': problemas
     }
-    
+
     return render(request, 'anomalias/verificar_sistema.html', context)
 
 @login_required
@@ -137,21 +150,21 @@ def alertas_usuario(request):
         color = 'warning'
         url = '#'
 
-        if alerta.tipo_alerta == 'nueva_anomalia':
+        if alerta.tipo == 'nueva_anomalia':
             icono = 'fas fa-user-exclamation'
             color = 'info'
             if alerta.deteccion_relacionada:
-                url = reverse('detalle_anomalia', args=[alerta.deteccion_relacionada.id])
-        elif alerta.tipo_alerta == 'anomalia_critica':
+                url = reverse('detalle_anomalia', args=[alerta.deteccion_relacionada.pk])
+        elif alerta.tipo == 'anomalia_critica':
             icono = 'fas fa-exclamation-triangle'
             color = 'danger'
             if alerta.deteccion_relacionada:
-                url = reverse('detalle_anomalia', args=[alerta.deteccion_relacionada.id])
-        elif alerta.tipo_alerta == 'asignatura_critica':
+                url = reverse('detalle_anomalia', args=[alerta.deteccion_relacionada.pk])
+        elif alerta.tipo == 'asignatura_critica':
             icono = 'fas fa-book-dead'
             color = 'warning'
             url = reverse('asignaturas_criticas')
-        elif alerta.tipo_alerta == 'seguimiento_vencido':
+        elif alerta.tipo == 'seguimiento_vencido':
             icono = 'fas fa-clock'
             color = 'secondary'
 

@@ -1607,21 +1607,22 @@ def actualizar_estado_anomalia(request, anomalia_id):
     if request.method == 'POST':
         nuevo_estado = request.POST.get('estado')
         observaciones = request.POST.get('observaciones', '')
-        
+
         try:
             # Usar método del modelo (Fat Model, Thin View)
             anomalia.actualizar_estado(nuevo_estado, observaciones, request.user)
-            
+
             # Notificar cambio
             enviar_notificacion_cambio_estado(anomalia, nuevo_estado)
-            
+
             messages.success(request, 'Estado actualizado correctamente')
-            return render(request, 'anomalias/detalle_anomalia.html')
-            
+            return redirect('detalle_anomalia', pk=anomalia_id)
+
         except ValueError as e:
-            return JsonResponse({'success': False, 'error': str(e)}, status=400)
-    
-    return render(request, 'anomalias/detalle_anomalia.html')
+            messages.error(request, str(e))
+            return redirect('detalle_anomalia', pk=anomalia_id)
+
+    return redirect('detalle_anomalia', pk=anomalia_id)
 
 @login_required
 def crear_derivacion(request, anomalia_id):
