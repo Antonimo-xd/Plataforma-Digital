@@ -21,7 +21,7 @@ from .services.import_service import ImportService
 from .services.reports_service import ReportsService
 
 # Imports de modelos y formularios
-from .models import (DeteccionAnomalia, CriterioAnomalia, Derivacion, Estudiante, Carrera, EjecucionAnalisis,InstanciaApoyo, Asignatura, RegistroAcademico)
+from .models import (DeteccionAnomalia, CriterioAnomalia, Derivacion, Estudiante, Carrera, EjecucionAnalisis,InstanciaApoyo, Asignatura, RegistroAcademico,Usuario)
 from .forms import (CriterioAnomaliaForm, DerivacionForm, FiltroAnomaliasForm, ImportarDatosForm)
 from .ML import ejecutar_deteccion_anomalias
 
@@ -223,7 +223,7 @@ def asignaturas_criticas(request):
                 messages.error(request, "Tu usuario no tiene una carrera asignada.")
                 return redirect('dashboard')
         
-        elif request.user.rol in ['coordinador_cpa', 'analista_cpa']:
+        elif request.user.rol in ['coordinador_cpa', 'analista_cpa','admin']:
             print(f"👑 {request.user.rol} - Acceso a todas las carreras")
             carrera = None
         
@@ -362,7 +362,7 @@ def asignaturas_criticas(request):
 
 
 @login_required
-@user_passes_test(lambda u: u.rol in ['analista_cpa', 'coordinador_cpa'])
+@user_passes_test(lambda u: u.rol in ['analista_cpa', 'coordinador_cpa','admin'])
 def gestionar_derivaciones(request):
     """Vista mejorada para gestionar derivaciones."""
     # Queryset base
@@ -418,7 +418,7 @@ def gestionar_derivaciones(request):
 
 # Vista para gestión masiva de anomalías
 @login_required
-@user_passes_test(lambda u: u.rol in ['analista_cpa', 'coordinador_cpa'])
+@user_passes_test(lambda u: u.rol in ['analista_cpa', 'coordinador_cpa','admin'])
 def gestion_masiva_anomalias(request):
     """
     🔧 FUNCIÓN MEJORADA: Gestión masiva de anomalías
@@ -543,7 +543,7 @@ def gestion_masiva_anomalias(request):
 
 # Vista para actualizar estado de derivación CORREGIDA
 @login_required
-@user_passes_test(lambda u: u.rol in ['analista_cpa', 'coordinador_cpa'])
+@user_passes_test(lambda u: u.rol in ['analista_cpa', 'coordinador_cpa','admin'])
 def actualizar_estado_derivacion(request, derivacion_id):
     """
     🔧 FUNCIÓN CORREGIDA: Actualizar estado de derivación
@@ -1530,7 +1530,7 @@ def listado_anomalias(request):
     total_anomalias = queryset.count()
 
     # Instancias de apoyo para derivaciones masivas
-    instancias_apoyo = InstanciaApoyo.objects.filter(activo=True).order_by('nombre')
+    instancias_apoyo = InstanciaApoyo.objects.filter(activo=True).order_by('nombre') 
 
     # Contexto completo
     context = {

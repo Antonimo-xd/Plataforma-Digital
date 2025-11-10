@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 # ================================================================
 
 @login_required
+@user_passes_test(lambda u: u.rol in ['analista_cpa', 'coordinador_cpa', 'coordinador_carrera', 'admin'])
 def asignaturas_criticas(request):
     """
     Vista simplificada para análisis de asignaturas críticas
@@ -23,11 +24,6 @@ def asignaturas_criticas(request):
     🎓 EDUCATIVO: Enfocarse en una sola responsabilidad:
     mostrar asignaturas con alto índice de anomalías.
     """
-    # Verificar permisos manualmente para evitar bucle de redirección
-    if not hasattr(request.user, 'rol') or not puede_ver_estadisticas(request.user):
-        from django.contrib import messages
-        messages.error(request, 'No tienes permisos para acceder a esta página.')
-        return redirect('dashboard')
 
     # Obtener asignaturas con más anomalías
     asignaturas_data = _calcular_asignaturas_criticas()
