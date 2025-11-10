@@ -14,6 +14,7 @@ import json
 # Imports de utilidades (ahora centralizadas)
 from .utils.permissions import ( puede_ver_anomalias)
 from .utils.notifications import (enviar_notificacion_derivacion, enviar_notificacion_cambio_estado)
+from .utils.helpers import (determinar_nivel_criticidad)
 
 # Imports de servicios
 from .services.import_service import ImportService
@@ -23,7 +24,6 @@ from .services.reports_service import ReportsService
 from .models import (DeteccionAnomalia, CriterioAnomalia, Derivacion, Estudiante, Carrera, EjecucionAnalisis,InstanciaApoyo, Asignatura, RegistroAcademico)
 from .forms import (CriterioAnomaliaForm, DerivacionForm, FiltroAnomaliasForm, ImportarDatosForm)
 from .ML import ejecutar_deteccion_anomalias
-
 
 @login_required
 def dashboard(request):
@@ -193,45 +193,6 @@ def dashboard(request):
     return render(request, 'anomalias/dashboard.html', context)
 
 @login_required
-def crear_derivacion(request, anomalia_id):
-    """
-    Crea una derivación a instancia de apoyo
-    
-    🎓 APRENDIZAJE: Separación de responsabilidades
-    - Vista: Maneja el formulario
-    - Notificaciones: En módulo aparte
-    """
-    anomalia = get_object_or_404(DeteccionAnomalia, id=anomalia_id)
-    
-    if not anomalia.puede_ser_derivada():
-        messages.error(request, 'Esta anomalía no puede ser derivada en su estado actual')
-        return redirect('detalle_anomalia', pk=anomalia_id)
-    
-    if request.method == 'POST':
-        form = DerivacionForm(request.POST)
-        if form.is_valid():
-            derivacion = form.save(commit=False)
-            derivacion.deteccion_anomalia = anomalia
-            derivacion.usuario_creador = request.user
-            derivacion.save()
-            
-            # Actualizar estado de anomalía
-            anomalia.actualizar_estado('derivada', 'Derivada a instancia de apoyo', request.user)
-            
-            # Notificar
-            enviar_notificacion_derivacion(derivacion)
-            
-            messages.success(request, 'Derivación creada exitosamente')
-            return redirect('detalle_anomalia', pk=anomalia_id)
-    else:
-        form = DerivacionForm()
-    
-    return render(request, 'anomalias/crear_derivacion.html', {
-        'form': form,
-        'anomalia': anomalia
-    })
-
-@login_required
 def exportar_reporte_anomalias(request):
     """
     Exporta reporte de anomalías a Excel
@@ -239,6 +200,166 @@ def exportar_reporte_anomalias(request):
     🎓 APRENDIZAJE: Usa el servicio de reportes
     """
     return ReportsService.exportar_anomalias_completo(request, formato='excel')
+
+@login_required
+def asignaturas_criticas(request):
+    """
+    Vista FINAL para asignaturas críticas - FUNCIONA según el debug
+    """
+    try:
+        print(f"\n🏫 === ASIGNATURAS CRÍTICAS FINAL ===")
+        print(f"Usuario: {request.user.username} ({request.user.rol})")
+        
+        carrera = None
+        asignaturas_query = Asignatura.objects.all()
+        
+        # Filtrar según el rol del usuario
+        if request.user.rol == 'coordinador_carrera':
+            try:
+                carrera = Carrera.objects.get(coordinador=request.user)
+                asignaturas_query = asignaturas_query.filter(carrera=carrera)
+                print(f"👨‍🎓 Coordinador de carrera - Filtrando por: {carrera.nombre}")
+            except Carrera.DoesNotExist:
+                messages.error(request, "Tu usuario no tiene una carrera asignada.")
+                return redirect('dashboard')
+        
+        elif request.user.rol in ['coordinador_cpa', 'analista_cpa']:
+            print(f"👑 {request.user.rol} - Acceso a todas las carreras")
+            carrera = None
+        
+        else:
+            messages.error(request, "No tienes permisos para acceder a esta sección.")
+            return redirect('dashboard')
+        
+        # Obtener asignaturas
+        asignaturas = asignaturas_query.select_related('carrera')
+        print(f"📚 Total asignaturas encontradas: {asignaturas.count()}")
+        
+        if not asignaturas.exists():
+            print("⚠️ No hay asignaturas en el sistema")
+            messages.warning(request, "No hay asignaturas registradas en el sistema.")
+            
+            return render(request, 'anomalias/asignaturas_criticas.html', {
+                'asignaturas_criticas': [],
+                'total_asignaturas': 0,
+                'total_criticas': 0,
+                'promedio_anomalias_carrera': 0,
+                'carrera': carrera,
+                'umbral_criticidad': 15.0,
+                'mostrar_todas_carreras': request.user.rol in ['coordinador_cpa', 'analista_cpa'],
+                'debug_info': 'No hay asignaturas disponibles'
+            })
+        
+        # Analizar cada asignatura
+        asignaturas_criticas = []
+        total_asignaturas = 0
+        suma_porcentajes = 0
+        
+        print(f"\n🔍 Analizando asignaturas...")
+        
+        for asignatura in asignaturas:
+            print(f"\n📖 Procesando: {asignatura.nombre}")
+            
+            # Obtener registros académicos para esta asignatura
+            registros = RegistroAcademico.objects.filter(
+                asignatura=asignatura,
+                estudiante__activo=True
+            )
+            
+            if not registros.exists():
+                print(f"   ⚠️ Sin registros para {asignatura.nombre}")
+                continue
+            
+            # Obtener estudiantes únicos
+            estudiantes_ids = list(registros.values_list('estudiante_id', flat=True).distinct())
+            total_estudiantes_asignatura = len(estudiantes_ids)
+            
+            print(f"   👥 Estudiantes únicos: {total_estudiantes_asignatura}")
+            
+            if total_estudiantes_asignatura == 0:
+                continue
+            
+            # Buscar anomalías ACTIVAS para estos estudiantes
+            anomalias_estudiantes = DeteccionAnomalia.objects.filter(
+                estudiante_id__in=estudiantes_ids,
+                estado__in=['detectado', 'en_revision', 'intervencion_activa']
+            )
+            
+            anomalias_count = anomalias_estudiantes.count()
+            print(f"   ⚠️ Anomalías activas: {anomalias_count}")
+            
+            # Calcular porcentaje
+            porcentaje_anomalias = (anomalias_count / total_estudiantes_asignatura) * 100
+            print(f"   📊 Porcentaje de anomalías: {porcentaje_anomalias:.2f}%")
+            
+            # Determinar nivel de criticidad
+            nivel_criticidad = determinar_nivel_criticidad(porcentaje_anomalias)
+            
+            # Agregar a la lista si es crítica (≥15% de anomalías)
+            if porcentaje_anomalias >= 15.0:
+                print(f"   🔴 CRÍTICA: {asignatura.nombre} - {porcentaje_anomalias:.2f}%")
+                
+                asignaturas_criticas.append({
+                    'asignatura': asignatura,
+                    'total_estudiantes': total_estudiantes_asignatura,
+                    'total_anomalias': anomalias_count,
+                    'porcentaje_anomalias': round(porcentaje_anomalias, 2),
+                    'nivel_criticidad': nivel_criticidad,
+                    'carrera_nombre': asignatura.carrera.nombre if asignatura.carrera else 'Sin carrera'
+                })
+            else:
+                print(f"   ✅ Normal: {asignatura.nombre} - {porcentaje_anomalias:.2f}%")
+            
+            total_asignaturas += 1
+            suma_porcentajes += porcentaje_anomalias
+        
+        # Ordenar por porcentaje de anomalías (de mayor a menor)
+        asignaturas_criticas.sort(key=lambda x: x['porcentaje_anomalias'], reverse=True)
+        
+        # Calcular promedio
+        promedio_anomalias_carrera = suma_porcentajes / total_asignaturas if total_asignaturas > 0 else 0
+        
+        print(f"\n📊 === RESULTADOS FINALES ===")
+        print(f"   Total asignaturas analizadas: {total_asignaturas}")
+        print(f"   Asignaturas críticas encontradas: {len(asignaturas_criticas)}")
+        print(f"   Promedio de anomalías: {promedio_anomalias_carrera:.2f}%")
+        
+        if len(asignaturas_criticas) > 0:
+            print(f"   🔴 ¡Se encontraron {len(asignaturas_criticas)} asignaturas críticas!")
+            for critica in asignaturas_criticas[:5]:  # Mostrar solo las primeras 5
+                print(f"      - {critica['asignatura'].nombre}: {critica['porcentaje_anomalias']}%")
+        
+        context = {
+            'asignaturas_criticas': asignaturas_criticas,
+            'total_asignaturas': total_asignaturas,
+            'total_criticas': len(asignaturas_criticas),
+            'promedio_anomalias_carrera': round(promedio_anomalias_carrera, 2),
+            'carrera': carrera,
+            'umbral_criticidad': 15.0,
+            'mostrar_todas_carreras': request.user.rol in ['coordinador_cpa', 'analista_cpa'],
+            'usuario_rol': request.user.rol,
+            'debug_info': f"Analizadas {total_asignaturas} asignaturas - {len(asignaturas_criticas)} críticas encontradas"
+        }
+        
+        return render(request, 'anomalias/asignaturas_criticas.html', context)
+        
+    except Exception as e:
+        print(f"❌ Error en asignaturas_criticas: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        messages.error(request, f'Error analizando asignaturas críticas: {str(e)}')
+        return render(request, 'anomalias/asignaturas_criticas.html', {
+            'asignaturas_criticas': [],
+            'total_asignaturas': 0,
+            'total_criticas': 0,
+            'promedio_anomalias_carrera': 0,
+            'carrera': None,
+            'umbral_criticidad': 15.0,
+            'error': True,
+            'error_message': str(e)
+        })
+
 
 @login_required
 @user_passes_test(lambda u: u.rol in ['analista_cpa', 'coordinador_cpa'])
@@ -446,6 +567,53 @@ def actualizar_estado_derivacion(request, derivacion_id):
             'error': str(e)
         }, status=500)
 
+@login_required
+@user_passes_test(lambda u: u.rol in ['admin', 'coordinador_cpa'])
+def verificar_sistema(request):
+    """Vista para verificación rápida del sistema."""
+    
+    # Estadísticas básicas
+    stats = {
+        'estudiantes_activos': Estudiante.objects.filter(activo=True).count(),
+        'registros_academicos': RegistroAcademico.objects.count(),
+        'criterios_activos': CriterioAnomalia.objects.filter(activo=True).count(),
+        'anomalias_total': DeteccionAnomalia.objects.count(),
+        'anomalias_activas': DeteccionAnomalia.objects.filter(
+            estado__in=['detectado', 'en_revision', 'intervencion_activa']
+        ).count(),
+        'ejecuciones_exitosas': EjecucionAnalisis.objects.filter(exitoso=True).count(),
+        'ultima_ejecucion': EjecucionAnalisis.objects.order_by('-fecha_ejecucion').first()
+    }
+    
+    # Problemas detectados
+    problemas = []
+    
+    if stats['estudiantes_activos'] < 10:
+        problemas.append('Muy pocos estudiantes activos (< 10)')
+    
+    if stats['registros_academicos'] < 30:
+        problemas.append('Muy pocos registros académicos (< 30)')
+    
+    if stats['criterios_activos'] == 0:
+        problemas.append('No hay criterios activos')
+    
+    if stats['anomalias_total'] == 0 and stats['ejecuciones_exitosas'] > 0:
+        problemas.append('Hay ejecuciones exitosas pero no hay anomalías guardadas')
+    
+    # Distribución por estudiante
+    if stats['estudiantes_activos'] > 0 and stats['registros_academicos'] > 0:
+        registros_por_estudiante = stats['registros_academicos'] / stats['estudiantes_activos']
+        if registros_por_estudiante < 3:
+            problemas.append(f'Pocos registros por estudiante ({registros_por_estudiante:.1f} < 3)')
+    
+    context = {
+        'stats': stats,
+        'problemas': problemas,
+        'estado_general': 'OK' if not problemas else 'PROBLEMAS DETECTADOS'
+    }
+    
+    return render(request, 'anomalias/verificar_sistema.html', context)
+
 # 🔧 VERIFICACIÓN RÁPIDA: Función para confirmar el nombre correcto
 def verificar_campo_ingreso():
     """
@@ -469,6 +637,11 @@ def verificar_campo_ingreso():
             
     except Exception as e:
         print(f"❌ Error: {str(e)}")
+
+@login_required
+def ayuda_documentacion(request):
+    """Vista para mostrar ayuda y documentación"""
+    return render(request, 'anomalias/ayuda_documentacion.html')
 
 def generar_reporte_anomalias_seleccionadas(anomalias_queryset, request):
     """
@@ -644,6 +817,203 @@ def generar_reporte_anomalias_seleccionadas(anomalias_queryset, request):
     return response
 
 @login_required
+def perfil_usuario(request):
+    """
+    👤 FUNCIÓN CORREGIDA: Vista de perfil de usuario
+    """
+    print(f"👤 Cargando perfil para usuario: {request.user.username}")
+    
+    try:
+        if request.method == 'POST':
+            print("📝 Procesando actualización de perfil...")
+            
+            # Obtener datos del formulario
+            nombre = request.POST.get('first_name', '').strip()
+            apellido = request.POST.get('last_name', '').strip()
+            email = request.POST.get('email', '').strip()
+            telefono = request.POST.get('telefono', '').strip()
+            
+            # Validaciones básicas
+            errores = []
+            
+            if not nombre:
+                errores.append("El nombre es obligatorio")
+            
+            if not email:
+                errores.append("El email es obligatorio")
+            elif not '@' in email:
+                errores.append("El email no es válido")
+            
+            # Verificar si el email ya existe (excepto el usuario actual)
+            if Usuario.objects.filter(email=email).exclude(id=request.user.id).exists():
+                errores.append("Este email ya está en uso por otro usuario")
+            
+            if errores:
+                for error in errores:
+                    messages.error(request, error)
+            else:
+                # Actualizar datos del usuario
+                request.user.first_name = nombre
+                request.user.last_name = apellido
+                request.user.email = email
+                
+                # Actualizar teléfono si el campo existe
+                if hasattr(request.user, 'telefono'):
+                    request.user.telefono = telefono
+                
+                request.user.save()
+                
+                messages.success(request, 'Perfil actualizado exitosamente.')
+                print(f"✅ Perfil actualizado para {request.user.username}")
+                
+                return redirect('perfil_usuario')
+        
+        # Calcular estadísticas del usuario
+        stats = {}
+        
+        # Estadísticas comunes para todos los roles
+        if request.user.rol in ['analista_cpa', 'coordinador_cpa']:
+            # Derivaciones creadas
+            stats['derivaciones_creadas'] = Derivacion.objects.filter(
+                derivado_por=request.user
+            ).count()
+            
+            # Anomalías revisadas
+            stats['anomalias_revisadas'] = DeteccionAnomalia.objects.filter(
+                revisado_por=request.user
+            ).count()
+            
+            # Derivaciones pendientes
+            stats['derivaciones_pendientes'] = Derivacion.objects.filter(
+                derivado_por=request.user,
+                estado__in=['pendiente', 'enviada']
+            ).count()
+            
+            # Anomalías resueltas por el usuario
+            stats['anomalias_resueltas'] = DeteccionAnomalia.objects.filter(
+                revisado_por=request.user,
+                estado='resuelto'
+            ).count()
+        
+        # Estadísticas específicas para coordinador CPA
+        if request.user.rol == 'coordinador_cpa':
+            stats['criterios_creados'] = CriterioAnomalia.objects.filter(
+                creado_por=request.user
+            ).count()
+            
+            stats['analisis_ejecutados'] = EjecucionAnalisis.objects.filter(
+                ejecutado_por=request.user
+            ).count()
+            
+            stats['criterios_activos'] = CriterioAnomalia.objects.filter(
+                creado_por=request.user,
+                activo=True
+            ).count()
+        
+        # Estadísticas para coordinador de carrera
+        if request.user.rol == 'coordinador_carrera':
+            try:
+                carrera = Carrera.objects.get(coordinador=request.user)
+                
+                stats['estudiantes_carrera'] = Estudiante.objects.filter(
+                    carrera=carrera,
+                    activo=True
+                ).count()
+                
+                stats['anomalias_carrera'] = DeteccionAnomalia.objects.filter(
+                    estudiante__carrera=carrera
+                ).count()
+                
+                stats['asignaturas_carrera'] = Asignatura.objects.filter(
+                    carrera=carrera
+                ).count()
+                
+                # Asignaturas críticas
+                asignaturas_criticas = 0
+                for asignatura in Asignatura.objects.filter(carrera=carrera):
+                    registros = RegistroAcademico.objects.filter(asignatura=asignatura)
+                    if registros.exists():
+                        estudiantes_ids = registros.values_list('estudiante_id', flat=True).distinct()
+                        anomalias = DeteccionAnomalia.objects.filter(
+                            estudiante_id__in=estudiantes_ids,
+                            estado__in=['detectado', 'en_revision', 'intervencion_activa']
+                        ).count()
+                        
+                        if len(estudiantes_ids) > 0:
+                            porcentaje = (anomalias / len(estudiantes_ids)) * 100
+                            if porcentaje >= 15:
+                                asignaturas_criticas += 1
+                
+                stats['asignaturas_criticas'] = asignaturas_criticas
+                stats['carrera_nombre'] = carrera.nombre
+                
+            except Carrera.DoesNotExist:
+                stats['carrera_nombre'] = 'Sin carrera asignada'
+                messages.warning(request, "Tu usuario no tiene carrera asignada.")
+        
+        # Actividad reciente del usuario
+        actividad_reciente = []
+        
+        # Últimas derivaciones
+        ultimas_derivaciones = Derivacion.objects.filter(
+            derivado_por=request.user
+        ).order_by('-fecha_derivacion')[:5]
+        
+        for derivacion in ultimas_derivaciones:
+            actividad_reciente.append({
+                'tipo': 'derivacion',
+                'descripcion': f'Derivación creada para {derivacion.deteccion_anomalia.estudiante.nombre}',
+                'fecha': derivacion.fecha_derivacion,
+                'url': reverse('detalle_anomalia', kwargs={'pk': derivacion.deteccion_anomalia.id})
+            })
+        
+        # Últimas anomalías revisadas
+        ultimas_revisiones = DeteccionAnomalia.objects.filter(
+            revisado_por=request.user
+        ).order_by('-fecha_ultima_actualizacion')[:5]
+        
+        for anomalia in ultimas_revisiones:
+            actividad_reciente.append({
+                'tipo': 'revision',
+                'descripcion': f'Anomalía revisada: {anomalia.estudiante.nombre}',
+                'fecha': anomalia.fecha_ultima_actualizacion,
+                'url': reverse('detalle_anomalia', kwargs={'pk': anomalia.id})
+            })
+        
+        # Ordenar actividad por fecha
+        actividad_reciente.sort(key=lambda x: x['fecha'], reverse=True)
+        actividad_reciente = actividad_reciente[:10]  # Top 10
+        
+        context = {
+            'usuario': request.user,
+            'stats': stats,
+            'actividad_reciente': actividad_reciente,
+            'roles_disponibles': Usuario.ROLES,
+        }
+        
+        print(f"📊 Estadísticas calculadas para {request.user.username}: {stats}")
+        
+        return render(request, 'anomalias/perfil_usuario.html', context)
+        
+    except Exception as e:
+        print(f"❌ Error en perfil_usuario: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        messages.error(request, f'Error cargando perfil: {str(e)}')
+        
+        # Contexto mínimo en caso de error
+        context = {
+            'usuario': request.user,
+            'stats': {},
+            'actividad_reciente': [],
+            'error': True
+        }
+        
+        return render(request, 'anomalias/perfil_usuario.html', context)
+
+
+@login_required
 @user_passes_test(lambda u: u.rol in ['admin', 'coordinador_cpa'])
 def importar_datos(request):
     """
@@ -720,51 +1090,6 @@ def importar_datos(request):
                         request,
                         f'⚠️ Se encontraron {total_advertencias} errores durante la importación. Revisa los detalles.'
                     )
-                
-
-
-                
-
-                print("\n" + "="*50)
-                print("INFORME DE IMPORTACIÓN (TERMINAL)")
-                print("="*50)
-
-                # Resumen de Estudiantes
-                print(f"\n--- ESTUDIANTES ({resultados['estudiantes']['importados']} importados) ---")
-                if resultados['estudiantes']['advertencias']:
-                    print(f"Total Advertencias: {len(resultados['estudiantes']['advertencias'])}")
-                    for adv in resultados['estudiantes']['advertencias']:
-                        print(f"  [ADV] {adv}")
-                else:
-                    print("  (Sin advertencias)")
-
-                # Resumen de Asignaturas
-                print(f"\n--- ASIGNATURAS ({resultados['asignaturas']['importados']} importadas) ---")
-                if resultados['asignaturas']['advertencias']:
-                    print(f"Total Advertencias: {len(resultados['asignaturas']['advertencias'])}")
-                    for adv in resultados['asignaturas']['advertencias']:
-                        print(f"  [ADV] {adv}")
-                else:
-                    print("  (Sin advertencias)")
-
-                # Resumen de Registros
-                print(f"\n--- REGISTROS ({resultados['registros']['importados']} importados) ---")
-                if resultados['registros']['advertencias']:
-                    print(f"Total Advertencias: {len(resultados['registros']['advertencias'])}")
-                    for adv in resultados['registros']['advertencias']:
-                        print(f"  [ADV] {adv}")
-                else:
-                    print("  (Sin advertencias)")
-
-                print("\n" + "="*50)
-                print("FIN DEL INFORME")
-                print("="*50 + "\n")
-
-
-
-
-
-
 
                 # Renderizar página de resultados (¡esto ahora funcionará!)
                 return render(request, 'anomalias/importar_resultados.html', {
@@ -1255,6 +1580,101 @@ def actualizar_estado_anomalia(request, anomalia_id):
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
     
     return render(request, 'anomalias/detalle_anomalia.html')
+
+@login_required
+def crear_derivacion(request, anomalia_id):
+    """
+    Crea una derivación a instancia de apoyo
+    
+    🎓 APRENDIZAJE: Separación de responsabilidades
+    - Vista: Maneja el formulario
+    - Notificaciones: En módulo aparte
+    """
+    anomalia = get_object_or_404(DeteccionAnomalia, id=anomalia_id)
+    
+    if not anomalia.puede_ser_derivada():
+        messages.error(request, 'Esta anomalía no puede ser derivada en su estado actual')
+        return redirect('detalle_anomalia', pk=anomalia_id)
+    
+    if request.method == 'POST':
+        form = DerivacionForm(request.POST)
+        if form.is_valid():
+            derivacion = form.save(commit=False)
+            derivacion.deteccion_anomalia = anomalia
+            derivacion.usuario_creador = request.user
+            derivacion.save()
+            
+            # Actualizar estado de anomalía
+            anomalia.actualizar_estado('derivada', 'Derivada a instancia de apoyo', request.user)
+            
+            # Notificar
+            enviar_notificacion_derivacion(derivacion)
+            
+            messages.success(request, 'Derivación creada exitosamente')
+            return redirect('detalle_anomalia', pk=anomalia_id)
+    else:
+        form = DerivacionForm()
+    
+    return render(request, 'anomalias/crear_derivacion.html', {
+        'form': form,
+        'anomalia': anomalia
+    })
+
+@login_required
+@user_passes_test(lambda u: u.rol in ['analista_cpa', 'coordinador_cpa', 'admin'])
+def gestionar_derivaciones(request):
+    """Vista mejorada para gestionar derivaciones."""
+    # Queryset base
+    derivaciones = Derivacion.objects.select_related(
+        'deteccion_anomalia__estudiante',
+        'deteccion_anomalia__estudiante__carrera',
+        'instancia_apoyo',
+        'derivado_por'
+    ).order_by('-fecha_derivacion')
+    
+    # Aplicar filtros
+    estado = request.GET.get('estado')
+    if estado:
+        derivaciones = derivaciones.filter(estado=estado)
+    
+    instancia = request.GET.get('instancia')
+    if instancia:
+        derivaciones = derivaciones.filter(instancia_apoyo_id=instancia)
+    
+    fecha_desde = request.GET.get('fecha_desde')
+    if fecha_desde:
+        derivaciones = derivaciones.filter(fecha_derivacion__date__gte=fecha_desde)
+    
+    busqueda = request.GET.get('busqueda')
+    if busqueda:
+        derivaciones = derivaciones.filter(
+            Q(deteccion_anomalia__estudiante__nombre__icontains=busqueda) |
+            Q(deteccion_anomalia__estudiante__id_estudiante__icontains=busqueda)
+        )
+    
+    # Estadísticas rápidas
+    total_derivaciones = derivaciones.count()
+    derivaciones_pendientes = derivaciones.filter(estado='pendiente').count()
+    derivaciones_proceso = derivaciones.filter(estado='en_proceso').count()
+    derivaciones_completadas = derivaciones.filter(estado='completada').count()
+    
+    # Paginación
+    paginator = Paginator(derivaciones, 15)
+    page = request.GET.get('page')
+    derivaciones_paginadas = paginator.get_page(page)
+    
+    context = {
+        'derivaciones': derivaciones_paginadas,
+        'derivaciones_pendientes': derivaciones_pendientes,
+        'derivaciones_proceso': derivaciones_proceso,
+        'derivaciones_completadas': derivaciones_completadas,
+        'total_derivaciones': total_derivaciones,
+        'estados_derivacion': Derivacion.ESTADOS_DERIVACION,
+        'instancias_apoyo': InstanciaApoyo.objects.filter(activo=True),
+    }
+    
+    return render(request, 'anomalias/gestionar_derivaciones.html', context)
+
 
 
 
