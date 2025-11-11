@@ -21,7 +21,7 @@ from .services.import_service import ImportService
 from .services.reports_service import ReportsService
 
 # Imports de modelos y formularios
-from .models import (DeteccionAnomalia, CriterioAnomalia, Derivacion, Estudiante, Carrera, EjecucionAnalisis,InstanciaApoyo, Asignatura, RegistroAcademico)
+from .models import (DeteccionAnomalia, CriterioAnomalia, Derivacion, Estudiante, Carrera, EjecucionAnalisis,InstanciaApoyo, Asignatura, RegistroAcademico,Usuario)
 from .forms import (CriterioAnomaliaForm, DerivacionForm, FiltroAnomaliasForm, ImportarDatosForm)
 from .ML import ejecutar_deteccion_anomalias
 
@@ -223,7 +223,7 @@ def asignaturas_criticas(request):
                 messages.error(request, "Tu usuario no tiene una carrera asignada.")
                 return redirect('dashboard')
         
-        elif request.user.rol in ['coordinador_cpa', 'analista_cpa']:
+        elif request.user.rol in ['coordinador_cpa', 'analista_cpa','admin']:
             print(f"👑 {request.user.rol} - Acceso a todas las carreras")
             carrera = None
         
@@ -362,7 +362,7 @@ def asignaturas_criticas(request):
 
 
 @login_required
-@user_passes_test(lambda u: u.rol in ['analista_cpa', 'coordinador_cpa'])
+@user_passes_test(lambda u: u.rol in ['analista_cpa', 'coordinador_cpa','admin'])
 def gestionar_derivaciones(request):
     """Vista mejorada para gestionar derivaciones."""
     # Queryset base
@@ -418,7 +418,7 @@ def gestionar_derivaciones(request):
 
 # Vista para gestión masiva de anomalías
 @login_required
-@user_passes_test(lambda u: u.rol in ['analista_cpa', 'coordinador_cpa'])
+@user_passes_test(lambda u: u.rol in ['analista_cpa', 'coordinador_cpa','admin'])
 def gestion_masiva_anomalias(request):
     """
     🔧 FUNCIÓN MEJORADA: Gestión masiva de anomalías
@@ -485,11 +485,64 @@ def gestion_masiva_anomalias(request):
                 messages.success(request, f'Se actualizó el estado de {count} anomalías a "{dict(DeteccionAnomalia.ESTADOS)[nuevo_estado]}".')
             else:
                 messages.error(request, 'Estado inválido.')
-        
+
         elif action == 'exportar':
             # Exportar solo las anomalías seleccionadas
-            return generar_reporte_anomalias_seleccionadas(request, anomalia_ids)
-        
+            return generar_reporte_anomalias_seleccionadas(anomalias, request)
+
+        elif action == 'derivar_masivo':
+            # Derivar masivamente
+            instancia_id = request.POST.get('instancia_apoyo')
+            motivo = request.POST.get('motivo', '')
+            prioridad = request.POST.get('prioridad', 3)
+
+            print(f"🔍 Derivar masivo - Instancia: {instancia_id}, Motivo: {motivo}, Prioridad: {prioridad}")
+            print(f"🔍 Anomalías a derivar: {anomalias.count()}")
+
+            try:
+                instancia = InstanciaApoyo.objects.get(id=instancia_id, activo=True)
+                count_derivadas = 0
+                count_no_derivables = 0
+                estados_encontrados = []
+
+                for anomalia in anomalias:
+                    # Log del estado de cada anomalía
+                    print(f"  - Anomalía #{anomalia.id}: estado={anomalia.estado}, puede_derivar={anomalia.puede_ser_derivada()}")
+                    estados_encontrados.append(anomalia.estado)
+
+                    # Solo derivar si puede ser derivada
+                    if anomalia.puede_ser_derivada():
+                        Derivacion.objects.create(
+                            deteccion_anomalia=anomalia,
+                            instancia_apoyo=instancia,
+                            motivo=motivo,
+                            prioridad=int(prioridad),
+                            derivado_por=request.user,
+                            estado='pendiente'
+                        )
+                        # Actualizar estado de la anomalía
+                        anomalia.estado = 'intervencion_activa'
+                        anomalia.revisado_por = request.user
+                        anomalia.fecha_ultima_actualizacion = timezone.now()
+                        anomalia.save()
+                        count_derivadas += 1
+                    else:
+                        count_no_derivables += 1
+
+                if count_derivadas > 0:
+                    if count_no_derivables > 0:
+                        messages.success(request, f'Se derivaron {count_derivadas} anomalías a "{instancia.nombre}". {count_no_derivables} no pudieron ser derivadas (estado no válido).')
+                    else:
+                        messages.success(request, f'Se derivaron {count_derivadas} anomalías a "{instancia.nombre}".')
+                else:
+                    estados_unicos = set(estados_encontrados)
+                    messages.warning(request, f'No se pudo derivar ninguna anomalía. Estados encontrados: {", ".join(estados_unicos)}. Estados válidos: detectado, en_revision, intervencion_activa.')
+
+            except InstanciaApoyo.DoesNotExist:
+                messages.error(request, 'Instancia de apoyo no encontrada.')
+            except ValueError as e:
+                messages.error(request, f'Error en los datos: {str(e)}')
+
         else:
             messages.error(request, f'Acción no válida: {action}.')
         
@@ -505,7 +558,7 @@ def gestion_masiva_anomalias(request):
 
 # Vista para actualizar estado de derivación CORREGIDA
 @login_required
-@user_passes_test(lambda u: u.rol in ['analista_cpa', 'coordinador_cpa'])
+@user_passes_test(lambda u: u.rol in ['analista_cpa', 'coordinador_cpa','admin'])
 def actualizar_estado_derivacion(request, derivacion_id):
     """
     🔧 FUNCIÓN CORREGIDA: Actualizar estado de derivación
@@ -1491,6 +1544,9 @@ def listado_anomalias(request):
     # Estadísticas rápidas
     total_anomalias = queryset.count()
 
+    # Instancias de apoyo para derivaciones masivas
+    instancias_apoyo = InstanciaApoyo.objects.filter(activo=True).order_by('nombre') 
+
     # Contexto completo
     context = {
         'anomalias': page_obj,  # Django espera 'object_list' o el nombre personalizado
@@ -1503,6 +1559,7 @@ def listado_anomalias(request):
         'carreras_disponibles': carreras_disponibles,
         'total_anomalias': total_anomalias,
         'usuario_rol': request.user.rol,
+        'instancias_apoyo': instancias_apoyo,
     }
 
     print(f"📋 Context data preparado - Total anomalías: {total_anomalias}")
@@ -1536,15 +1593,19 @@ def detalle_anomalia(request, pk):
     
     estados = DeteccionAnomalia.ESTADOS
 
+    # Obtener instancias de apoyo activas para el modal de derivación
+    instancias_apoyo = InstanciaApoyo.objects.filter(activo=True).order_by('nombre')
+
     evolucion_datos = json.dumps(evolucion_datos)
 
     # 4. Creamos el diccionario de 'context' manualmente
     context = {
-        'anomalia': anomalia, 
+        'anomalia': anomalia,
         'registros_academicos': registros_estudiante,
         'derivaciones': derivaciones,
         'evolucion_datos': evolucion_datos,
         'estados': estados,
+        'instancias_apoyo': instancias_apoyo,
     }
 
     # 5. Renderizamos el 'template_name' con el 'context'
@@ -1565,21 +1626,22 @@ def actualizar_estado_anomalia(request, anomalia_id):
     if request.method == 'POST':
         nuevo_estado = request.POST.get('estado')
         observaciones = request.POST.get('observaciones', '')
-        
+
         try:
             # Usar método del modelo (Fat Model, Thin View)
             anomalia.actualizar_estado(nuevo_estado, observaciones, request.user)
-            
+
             # Notificar cambio
             enviar_notificacion_cambio_estado(anomalia, nuevo_estado)
-            
+
             messages.success(request, 'Estado actualizado correctamente')
-            return render(request, 'anomalias/detalle_anomalia.html')
-            
+            return redirect('detalle_anomalia', pk=anomalia_id)
+
         except ValueError as e:
-            return JsonResponse({'success': False, 'error': str(e)}, status=400)
-    
-    return render(request, 'anomalias/detalle_anomalia.html')
+            messages.error(request, str(e))
+            return redirect('detalle_anomalia', pk=anomalia_id)
+
+    return redirect('detalle_anomalia', pk=anomalia_id)
 
 @login_required
 def crear_derivacion(request, anomalia_id):

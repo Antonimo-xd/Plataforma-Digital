@@ -643,32 +643,73 @@ def calcular_metricas_rendimiento(estudiante):
 def _calcular_asignaturas_criticas():
     """
     Función auxiliar para calcular asignaturas críticas
-    
+
     🎓 EDUCATIVO: Separar cálculos complejos permite testing
     independiente y reutilización.
     """
-    from django.db.models import Count, F
-    
-    asignaturas = Asignatura.objects.annotate(
-        total_estudiantes=Count('registroacademico__estudiante', distinct=True),
-        total_anomalias=Count('registroacademico__estudiante__deteccionanomalia', distinct=True)
-    ).filter(
-        total_estudiantes__gt=0
-    ).annotate(
-        porcentaje_anomalias=F('total_anomalias') * 100.0 / F('total_estudiantes')
-    ).filter(
-        porcentaje_anomalias__gte=20  # 20% o más
-    ).order_by('-porcentaje_anomalias')[:10]
-    
-    return asignaturas
+    from ..models import Asignatura, RegistroAcademico, DeteccionAnomalia
+
+    # Obtener todas las asignaturas
+    asignaturas = Asignatura.objects.all()
+
+    # Diccionario para almacenar estadísticas por asignatura
+    estadisticas = []
+
+    for asignatura in asignaturas:
+        # Obtener estudiantes únicos que cursaron esta asignatura
+        registros = RegistroAcademico.objects.filter(asignatura=asignatura)
+        estudiantes_ids = registros.values_list('estudiante_id', flat=True).distinct()
+        total_estudiantes = len(estudiantes_ids)
+
+        if total_estudiantes == 0:
+            continue
+
+        # Contar anomalías activas de estudiantes de esta asignatura
+        anomalias_count = DeteccionAnomalia.objects.filter(
+            estudiante_id__in=estudiantes_ids,
+            estado__in=['detectado', 'en_revision', 'intervencion_activa']
+        ).values('estudiante_id').distinct().count()
+
+        # Calcular porcentaje
+        porcentaje = (anomalias_count / total_estudiantes) * 100 if total_estudiantes > 0 else 0
+
+        # Determinar nivel de criticidad
+        if porcentaje >= 30:
+            nivel = 'muy_alta'
+        elif porcentaje >= 20:
+            nivel = 'alta'
+        elif porcentaje >= 15:
+            nivel = 'media'
+        else:
+            nivel = 'baja'
+
+        # Solo incluir si es crítica (>= 20%)
+        if porcentaje >= 20:
+            estadisticas.append({
+                'asignatura': asignatura,
+                'total_estudiantes': total_estudiantes,
+                'total_anomalias': anomalias_count,
+                'porcentaje_anomalias': round(porcentaje, 1),
+                'nivel_criticidad': nivel
+            })
+
+    # Ordenar por porcentaje de anomalías (descendente)
+    estadisticas.sort(key=lambda x: x['porcentaje_anomalias'], reverse=True)
+
+    return estadisticas[:10]  # Top 10
 
 def _obtener_estadisticas_sistema():
     """Obtiene estadísticas básicas del sistema"""
+    anomalias_activas = DeteccionAnomalia.objects.filter(
+        estado__in=['detectado', 'en_revision', 'intervencion_activa']
+    ).count()
+
     return {
         'estudiantes_activos': Estudiante.objects.filter(activo=True).count(),
         'registros_academicos': RegistroAcademico.objects.count(),
         'criterios_activos': CriterioAnomalia.objects.filter(activo=True).count(),
         'anomalias_total': DeteccionAnomalia.objects.count(),
+        'anomalias_activas': anomalias_activas,
         'anomalias_pendientes': DeteccionAnomalia.objects.filter(
             estado__in=['detectado', 'en_revision']
         ).count()

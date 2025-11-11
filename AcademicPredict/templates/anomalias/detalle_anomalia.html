@@ -24,9 +24,9 @@
                     <i class="fas fa-arrow-left me-2"></i>Volver al Listado
                 </a>
                 {% if user.rol == 'analista_cpa' or user.rol == 'admin'%}
-                <a href="{% url 'crear_derivacion' anomalia.id %}" class="btn btn-primary">
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalDerivarAnomalia">
                     <i class="fas fa-share me-2"></i>Crear Derivación
-                </a>
+                </button>
                 {% endif %}
             </div>
         </div>
@@ -324,24 +324,76 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <p class="mb-3">Estado actual: <strong class="text-primary">{{ anomalia.get_estado_display }}</strong></p>
+
                     <div class="mb-3">
-                        <label class="form-label">Nuevo Estado</label>
+                        <label class="form-label">Nuevo Estado *</label>
                         <select name="estado" class="form-select" required>
+                            <option value="">Seleccionar nuevo estado...</option>
                             {% for codigo, nombre in estados %}
-                            <option value="{{ codigo }}" {% if codigo == anomalia.estado %}selected{% endif %}>
-                                {{ nombre }}
-                            </option>
+                            {% if codigo != anomalia.estado %}
+                            <option value="{{ codigo }}">{{ nombre }}</option>
+                            {% endif %}
                             {% endfor %}
                         </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Observaciones</label>
-                        <textarea name="observaciones" class="form-control" rows="3" placeholder="Comentarios sobre el cambio de estado...">{{ anomalia.observaciones }}</textarea>
+                        <small class="text-muted">Selecciona el nuevo estado para esta anomalía</small>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Actualizar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para crear derivación -->
+<div class="modal fade" id="modalDerivarAnomalia" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Crear Derivación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'gestion_masiva_anomalias' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="derivar_masivo">
+                <input type="hidden" name="anomalias_seleccionadas" value="{{ anomalia.id }}">
+                <div class="modal-body">
+                    <p>¿Deseas derivar esta anomalía a una instancia de apoyo?</p>
+
+                    <div class="mb-3">
+                        <label class="form-label">Instancia de Apoyo</label>
+                        <select name="instancia_apoyo" class="form-select" required>
+                            <option value="">Seleccionar instancia...</option>
+                            {% if instancias_apoyo %}
+                                {% for instancia in instancias_apoyo %}
+                                <option value="{{ instancia.id }}">{{ instancia.nombre }}</option>
+                                {% endfor %}
+                            {% endif %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Motivo</label>
+                        <textarea name="motivo" class="form-control" rows="3" required placeholder="Describe el motivo de la derivación..."></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Prioridad</label>
+                        <select name="prioridad" class="form-select" required>
+                            <option value="3" selected>Media</option>
+                            <option value="1">Baja</option>
+                            <option value="2">Normal</option>
+                            <option value="4">Alta</option>
+                            <option value="5">Crítica</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Crear Derivación</button>
                 </div>
             </form>
         </div>

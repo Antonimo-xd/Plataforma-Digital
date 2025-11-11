@@ -9,7 +9,7 @@ from django.conf import settings
 from . import views
 
 # 🔧 VISTAS SECUNDARIAS (Solo las optimizadas)
-from .vistas.secondary_views import (asignaturas_criticas, alertas_usuario, verificar_sistema,)
+from .vistas.secondary_views import (asignaturas_criticas, alertas_usuario, verificar_sistema, detalle_derivacion_view)
 
 # 📊 APIs DEL DASHBOARD (Mantener todas)
 from .api.dashboard_api import ( api_datos_dashboard, api_evolucion_anomalias, api_tipos_anomalias, api_datos_tiempo_real, api_alertas_count, api_distribucion_carrera, api_registros_semestre, api_estadisticas_distribucion, api_estudiante_detalle, api_exportar_datos_avanzado)
@@ -18,6 +18,20 @@ from .api.dashboard_api import ( api_datos_dashboard, api_evolucion_anomalias, a
 from .services.reports_service import ( exportar_reporte_derivaciones, exportar_todas_anomalias)
 
 from .utils.helpers import detalle_derivacion_ajax
+
+# 🔮 VISTAS DE PREDICCIÓN DE DESERCIÓN
+from .vistas.prediccion_views import (
+    dashboard_predicciones,
+    ver_cohorte,
+    seguimiento_estudiante,
+    buscar_estudiantes,
+    generar_prediccion,
+    generar_predicciones_masivas,
+    api_obtener_cohorte,
+    api_seguimiento_estudiante,
+    api_estadisticas_cohortes,
+    api_alertas_activas
+)
 
 # ================================================================
 # CONFIGURACIÓN DE URLs OPTIMIZADA
@@ -64,7 +78,7 @@ urlpatterns = [
     
     path('derivaciones/', views.gestionar_derivaciones, name='gestionar_derivaciones'),
     path('anomalias/<int:anomalia_id>/derivar/', views.crear_derivacion, name='crear_derivacion'),
-    path('derivaciones/<int:derivacion_id>/detalle/',detalle_derivacion_ajax, name='detalle_derivacion_ajax'),
+    path('derivaciones/<int:derivacion_id>/detalle/', detalle_derivacion_view, name='detalle_derivacion_ajax'),
     path('derivaciones/<int:derivacion_id>/actualizar-estado/', views.actualizar_estado_derivacion, name='actualizar_estado_derivacion'),
     
     # ================================================================
@@ -112,5 +126,25 @@ urlpatterns = [
     path('api/exportar-datos-avanzado/', api_exportar_datos_avanzado, name='api_exportar_datos_avanzado'),
 
     path('ayuda/', views.ayuda_documentacion, name='ayuda_documentacion'),
+
+    # ================================================================
+    # 🔮 SISTEMA DE PREDICCIÓN DE DESERCIÓN
+    # ================================================================
+
+    # Dashboard y visualizaciones principales
+    path('predicciones/', dashboard_predicciones, name='dashboard_predicciones'),
+    path('predicciones/cohorte/<int:numero_cohorte>/semestre/<int:semestre>/', ver_cohorte, name='ver_cohorte'),
+    path('predicciones/estudiante/<int:estudiante_id>/seguimiento/', seguimiento_estudiante, name='seguimiento_estudiante'),
+    path('predicciones/buscar/', buscar_estudiantes, name='buscar_estudiantes'),
+
+    # Acciones de predicción
+    path('predicciones/generar/<int:estudiante_id>/', generar_prediccion, name='generar_prediccion'),
+    path('predicciones/generar-masivas/', generar_predicciones_masivas, name='generar_predicciones_masivas'),
+
+    # APIs de predicción
+    path('api/predicciones/cohorte/<int:numero_cohorte>/semestre/<int:semestre>/', api_obtener_cohorte, name='api_obtener_cohorte'),
+    path('api/predicciones/estudiante/<int:estudiante_id>/seguimiento/', api_seguimiento_estudiante, name='api_seguimiento_estudiante'),
+    path('api/predicciones/estadisticas-cohortes/', api_estadisticas_cohortes, name='api_estadisticas_cohortes'),
+    path('api/predicciones/alertas-activas/', api_alertas_activas, name='api_alertas_activas'),
     
 ]

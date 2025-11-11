@@ -205,7 +205,7 @@ class DeteccionAnomalia(models.Model):
     
     def puede_ser_derivada(self):
         """Verifica si la anomalía puede ser derivada"""
-        return self.estado in ['en_revision', 'detectado']
+        return self.estado in ['detectado', 'en_revision', 'intervencion_activa']
     
     def es_critica(self):
         """Verifica si la anomalía es de nivel crítico"""
@@ -349,3 +349,339 @@ class AsignaturaCritica(models.Model):
     
     def __str__(self):
         return f"{self.asignatura.nombre} - {self.porcentaje_anomalias:.1f}% anomalías"
+    
+# ===============================================================================
+# MODELOS PARA PREDICCIÓN DE DESERCIÓN ESTUDIANTIL
+# ===============================================================================
+
+
+class PrediccionDesercion(models.Model):
+    """
+    Modelo para almacenar las predicciones de deserción de estudiantes.
+    Utiliza el modelo de Machine Learning entrenado.
+    """
+    ESTADOS_PREDICCION = [
+        ('Dropout', 'Deserción'),
+        ('Enrolled', 'Inscrito'),
+        ('Graduate', 'Graduado'),
+    ]
+
+    NIVELES_RIESGO = [
+        ('bajo', 'Bajo'),
+        ('medio', 'Medio'),
+        ('alto', 'Alto'),
+        ('critico', 'Crítico'),
+    ]
+
+    estudiante = models.ForeignKey(Estudiante, on_delete=models.CASCADE, related_name='predicciones')
+    semestre_academico = models.IntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(10)],
+        help_text="Semestre en el que se realizó la predicción"
+    )
+
+    # Predicción del modelo
+    prediccion = models.CharField(max_length=10, choices=ESTADOS_PREDICCION)
+
+    # Probabilidades
+    probabilidad_desercion = models.FloatField(
+        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
+    )
+    probabilidad_graduacion = models.FloatField(
+        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
+    )
+    probabilidad_inscrito = models.FloatField(
+        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
+    )
+
+    # Nivel de riesgo calculado
+    nivel_riesgo = models.CharField(max_length=10, choices=NIVELES_RIESGO)
+
+    # Cohorte asignada
+    cohorte = models.IntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(3)],
+        help_text="1=Crítico, 2=Alto, 3=Medio-Bajo"
+    )
+
+    # Métricas usadas para la predicción
+    promedio_notas = models.FloatField()
+    asistencia_promedio = models.FloatField()
+    uso_plataforma = models.FloatField()
+    materias_aprobadas = models.IntegerField()
+    materias_inscritas = models.IntegerField()
+
+    # Metadatos
+    fecha_prediccion = models.DateTimeField(default=timezone.now)
+    modelo_version = models.CharField(max_length=50, default="v1.0")
+
+    class Meta:
+        verbose_name = "Predicción de Deserción"
+        verbose_name_plural = "Predicciones de Deserción"
+        ordering = ['-fecha_prediccion', '-probabilidad_desercion']
+        indexes = [
+            models.Index(fields=['estudiante', 'semestre_academico']),
+            models.Index(fields=['cohorte', 'nivel_riesgo']),
+        ]
+
+    def __str__(self):
+        return f"{self.estudiante.nombre} - S{self.semestre_academico} - {self.get_prediccion_display()} ({self.probabilidad_desercion:.1%})"
+
+    def es_riesgo_alto(self):
+        """Verifica si el estudiante está en riesgo alto o crítico"""
+        return self.nivel_riesgo in ['alto', 'critico']
+
+    def obtener_color_riesgo(self):
+        """Retorna el color asociado al nivel de riesgo"""
+        colores = {
+            'bajo': '#4CAF50',
+            'medio': '#FFCC00',
+            'alto': '#FF8800',
+            'critico': '#FF0000'
+        }
+        return colores.get(self.nivel_riesgo, '#999999')
+
+class SeguimientoEstudiante(models.Model):
+    """
+    Modelo para el seguimiento temporal de un estudiante a través de los semestres.
+    Permite visualizar la evolución del riesgo de deserción.
+    """
+    estudiante = models.OneToOneField(Estudiante, on_delete=models.CASCADE, related_name='seguimiento')
+
+    # Historial de predicciones (JSON)
+    historial_predicciones = models.JSONField(
+        default=list,
+        help_text="Lista de predicciones por semestre"
+    )
+
+    # Tendencia general
+    tendencia = models.CharField(
+        max_length=30,
+        choices=[
+            ('mejora_significativa', 'Mejora Significativa'),
+            ('mejora_leve', 'Mejora Leve'),
+            ('estable', 'Estable'),
+            ('deterioro_leve', 'Deterioro Leve'),
+            ('deterioro_significativo', 'Deterioro Significativo'),
+            ('sin_datos_suficientes', 'Sin Datos Suficientes'),
+        ],
+        default='sin_datos_suficientes'
+    )
+
+    # Cambio total en probabilidad de deserción
+    cambio_total_riesgo = models.FloatField(default=0.0)
+
+    # Estado actual
+    ultimo_nivel_riesgo = models.CharField(max_length=10, blank=True)
+    ultima_actualizacion = models.DateTimeField(auto_now=True)
+
+    # Alertas generadas
+    tiene_alertas_activas = models.BooleanField(default=False)
+    total_alertas = models.IntegerField(default=0)
+
+    class Meta:
+        verbose_name = "Seguimiento de Estudiante"
+        verbose_name_plural = "Seguimientos de Estudiantes"
+
+    def __str__(self):
+        return f"Seguimiento: {self.estudiante.nombre}"
+
+    def actualizar_seguimiento(self):
+        """Actualiza el seguimiento con la última predicción"""
+        predicciones = PrediccionDesercion.objects.filter(
+            estudiante=self.estudiante
+        ).order_by('semestre_academico')
+
+        if predicciones.count() < 2:
+            self.tendencia = 'sin_datos_suficientes'
+            self.cambio_total_riesgo = 0.0
+        else:
+            primera = predicciones.first()
+            ultima = predicciones.last()
+
+            self.cambio_total_riesgo = ultima.probabilidad_desercion - primera.probabilidad_desercion
+
+            # Determinar tendencia
+            if self.cambio_total_riesgo >= 0.15:
+                self.tendencia = 'deterioro_significativo'
+            elif self.cambio_total_riesgo >= 0.05:
+                self.tendencia = 'deterioro_leve'
+            elif self.cambio_total_riesgo <= -0.15:
+                self.tendencia = 'mejora_significativa'
+            elif self.cambio_total_riesgo <= -0.05:
+                self.tendencia = 'mejora_leve'
+            else:
+                self.tendencia = 'estable'
+
+            self.ultimo_nivel_riesgo = ultima.nivel_riesgo
+
+        # Actualizar historial
+        hist_list = []
+        for pred in predicciones.values('semestre_academico', 'probabilidad_desercion', 'cohorte', 'prediccion', 'fecha_prediccion'):
+            # Convertir datetime a string para JSON serialization
+            pred_dict = dict(pred)
+            if 'fecha_prediccion' in pred_dict and pred_dict['fecha_prediccion']:
+                pred_dict['fecha_prediccion'] = pred_dict['fecha_prediccion'].isoformat()
+            hist_list.append(pred_dict)
+        self.historial_predicciones = hist_list
+
+        self.save()
+
+class CohorteEstudiantil(models.Model):
+    """
+    Modelo para agrupar estudiantes en cohortes según su riesgo de deserción.
+    """
+    COHORTES = [
+        (1, 'Cohorte 1 - Riesgo Crítico'),
+        (2, 'Cohorte 2 - Riesgo Alto'),
+        (3, 'Cohorte 3 - Riesgo Medio-Bajo'),
+    ]
+
+    nombre = models.CharField(max_length=100)
+    numero_cohorte = models.IntegerField(choices=COHORTES)
+    semestre_academico = models.IntegerField()
+
+    # Descripción y acciones recomendadas
+    descripcion = models.TextField()
+    acciones_recomendadas = models.JSONField(default=list)
+
+    # Umbrales de probabilidad
+    umbral_min = models.FloatField()
+    umbral_max = models.FloatField()
+
+    # Color para visualización
+    color = models.CharField(max_length=7, default='#999999')
+
+    # Estadísticas
+    total_estudiantes = models.IntegerField(default=0)
+    porcentaje_total = models.FloatField(default=0.0)
+
+    # Metadatos
+    fecha_creacion = models.DateTimeField(default=timezone.now)
+    activa = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "Cohorte Estudiantil"
+        verbose_name_plural = "Cohortes Estudiantiles"
+        unique_together = ['numero_cohorte', 'semestre_academico']
+        ordering = ['numero_cohorte']
+
+    def __str__(self):
+        return f"{self.nombre} - Semestre {self.semestre_academico}"
+
+    def obtener_estudiantes(self):
+        """Retorna los estudiantes que pertenecen a esta cohorte"""
+        return PrediccionDesercion.objects.filter(
+            cohorte=self.numero_cohorte,
+            semestre_academico=self.semestre_academico
+        ).select_related('estudiante')
+
+    def actualizar_estadisticas(self):
+        """Actualiza las estadísticas de la cohorte"""
+        estudiantes = self.obtener_estudiantes()
+        self.total_estudiantes = estudiantes.count()
+
+        total_semestre = PrediccionDesercion.objects.filter(
+            semestre_academico=self.semestre_academico
+        ).count()
+
+        if total_semestre > 0:
+            self.porcentaje_total = (self.total_estudiantes / total_semestre) * 100
+
+        self.save()
+
+class AlertaPrediccion(models.Model):
+    """
+    Modelo para alertas generadas automáticamente basadas en las predicciones.
+    """
+    TIPOS_ALERTA = [
+        ('riesgo_critico', 'Riesgo Crítico Detectado'),
+        ('deterioro_significativo', 'Deterioro Significativo'),
+        ('cambio_cohorte', 'Cambio de Cohorte'),
+        ('mejora_significativa', 'Mejora Significativa'),
+    ]
+
+    PRIORIDADES = [
+        ('baja', 'Baja'),
+        ('media', 'Media'),
+        ('alta', 'Alta'),
+        ('critica', 'Crítica'),
+    ]
+
+    prediccion = models.ForeignKey(PrediccionDesercion, on_delete=models.CASCADE, related_name='alertas')
+    tipo_alerta = models.CharField(max_length=30, choices=TIPOS_ALERTA)
+    prioridad = models.CharField(max_length=10, choices=PRIORIDADES)
+
+    titulo = models.CharField(max_length=200)
+    descripcion = models.TextField()
+    accion_sugerida = models.TextField()
+
+    # Estado
+    activa = models.BooleanField(default=True)
+    fecha_generacion = models.DateTimeField(default=timezone.now)
+    fecha_revision = models.DateTimeField(null=True, blank=True)
+    revisada_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Alerta de Predicción"
+        verbose_name_plural = "Alertas de Predicción"
+        ordering = ['-fecha_generacion', '-prioridad']
+
+    def __str__(self):
+        return f"{self.titulo} - {self.prediccion.estudiante.nombre}"
+
+    def marcar_como_revisada(self, usuario):
+        """Marca la alerta como revisada"""
+        self.fecha_revision = timezone.now()
+        self.revisada_por = usuario
+        self.activa = False
+        self.save()
+
+class ComparacionIntervenciones(models.Model):
+    """
+    Modelo para comparar el estado de un estudiante antes y después de intervenciones.
+    """
+    estudiante = models.ForeignKey(Estudiante, on_delete=models.CASCADE, related_name='comparaciones')
+
+    # Predicciones a comparar
+    prediccion_antes = models.ForeignKey(
+        PrediccionDesercion,
+        on_delete=models.CASCADE,
+        related_name='comparaciones_como_antes'
+    )
+    prediccion_despues = models.ForeignKey(
+        PrediccionDesercion,
+        on_delete=models.CASCADE,
+        related_name='comparaciones_como_despues'
+    )
+
+    # Cambios detectados
+    cambio_probabilidad = models.FloatField()
+    cambio_cohorte = models.IntegerField()
+
+    # Clasificación del cambio
+    clasificacion = models.CharField(
+        max_length=30,
+        choices=[
+            ('mejora_significativa', 'Mejora Significativa'),
+            ('mejora_leve', 'Mejora Leve'),
+            ('estable', 'Estable'),
+            ('deterioro_leve', 'Deterioro Leve'),
+            ('deterioro_significativo', 'Deterioro Significativo'),
+        ]
+    )
+
+    # Intervención realizada
+    intervencion_descripcion = models.TextField(blank=True)
+    tipo_intervencion = models.CharField(max_length=100, blank=True)
+
+    # Metadatos
+    fecha_comparacion = models.DateTimeField(default=timezone.now)
+    creada_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True)
+
+    class Meta:
+        verbose_name = "Comparación de Intervención"
+        verbose_name_plural = "Comparaciones de Intervenciones"
+        ordering = ['-fecha_comparacion']
+
+    def __str__(self):
+        return f"Comparación: {self.estudiante.nombre} - S{self.prediccion_antes.semestre_academico} vs S{self.prediccion_despues.semestre_academico}"
+
