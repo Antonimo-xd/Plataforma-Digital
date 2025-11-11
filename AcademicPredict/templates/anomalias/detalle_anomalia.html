@@ -324,19 +324,19 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <p class="mb-3">Estado actual: <strong class="text-primary">{{ anomalia.get_estado_display }}</strong></p>
+
                     <div class="mb-3">
-                        <label class="form-label">Nuevo Estado</label>
+                        <label class="form-label">Nuevo Estado *</label>
                         <select name="estado" class="form-select" required>
+                            <option value="">Seleccionar nuevo estado...</option>
                             {% for codigo, nombre in estados %}
-                            <option value="{{ codigo }}" {% if codigo == anomalia.estado %}selected{% endif %}>
-                                {{ nombre }}
-                            </option>
+                            {% if codigo != anomalia.estado %}
+                            <option value="{{ codigo }}">{{ nombre }}</option>
+                            {% endif %}
                             {% endfor %}
                         </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Observaciones</label>
-                        <textarea name="observaciones" class="form-control" rows="3" placeholder="Comentarios sobre el cambio de estado...">{{ anomalia.observaciones }}</textarea>
+                        <small class="text-muted">Selecciona el nuevo estado para esta anomalía</small>
                     </div>
                 </div>
                 <div class="modal-footer">

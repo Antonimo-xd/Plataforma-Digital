@@ -496,11 +496,20 @@ def gestion_masiva_anomalias(request):
             motivo = request.POST.get('motivo', '')
             prioridad = request.POST.get('prioridad', 3)
 
+            print(f"🔍 Derivar masivo - Instancia: {instancia_id}, Motivo: {motivo}, Prioridad: {prioridad}")
+            print(f"🔍 Anomalías a derivar: {anomalias.count()}")
+
             try:
                 instancia = InstanciaApoyo.objects.get(id=instancia_id, activo=True)
                 count_derivadas = 0
+                count_no_derivables = 0
+                estados_encontrados = []
 
                 for anomalia in anomalias:
+                    # Log del estado de cada anomalía
+                    print(f"  - Anomalía #{anomalia.id}: estado={anomalia.estado}, puede_derivar={anomalia.puede_ser_derivada()}")
+                    estados_encontrados.append(anomalia.estado)
+
                     # Solo derivar si puede ser derivada
                     if anomalia.puede_ser_derivada():
                         Derivacion.objects.create(
@@ -517,11 +526,17 @@ def gestion_masiva_anomalias(request):
                         anomalia.fecha_ultima_actualizacion = timezone.now()
                         anomalia.save()
                         count_derivadas += 1
+                    else:
+                        count_no_derivables += 1
 
                 if count_derivadas > 0:
-                    messages.success(request, f'Se derivaron {count_derivadas} anomalías a "{instancia.nombre}".')
+                    if count_no_derivables > 0:
+                        messages.success(request, f'Se derivaron {count_derivadas} anomalías a "{instancia.nombre}". {count_no_derivables} no pudieron ser derivadas (estado no válido).')
+                    else:
+                        messages.success(request, f'Se derivaron {count_derivadas} anomalías a "{instancia.nombre}".')
                 else:
-                    messages.warning(request, 'No se pudo derivar ninguna anomalía. Verifica que estén en estado válido.')
+                    estados_unicos = set(estados_encontrados)
+                    messages.warning(request, f'No se pudo derivar ninguna anomalía. Estados encontrados: {", ".join(estados_unicos)}. Estados válidos: detectado, en_revision, intervencion_activa.')
 
             except InstanciaApoyo.DoesNotExist:
                 messages.error(request, 'Instancia de apoyo no encontrada.')
