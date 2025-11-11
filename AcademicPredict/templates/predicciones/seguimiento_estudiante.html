@@ -1,0 +1,313 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Seguimiento: {{ estudiante.nombre }} - Sistema CPA{% endblock %}
+
+{% block extra_css %}
+<style>
+    .timeline {
+        position: relative;
+        padding: 20px 0;
+    }
+    .timeline-item {
+        position: relative;
+        padding-left: 50px;
+        margin-bottom: 30px;
+    }
+    .timeline-marker {
+        position: absolute;
+        left: 0;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        color: white;
+    }
+    .riesgo-critico-bg { background-color: #FF0000; }
+    .riesgo-alto-bg { background-color: #FF8800; }
+    .riesgo-medio-bg { background-color: #FFCC00; color: #333; }
+    .riesgo-bajo-bg { background-color: #4CAF50; }
+
+    .metric-card {
+        border-radius: 10px;
+        padding: 15px;
+        text-align: center;
+    }
+    .tendencia-mejora { color: #4CAF50; }
+    .tendencia-deterioro { color: #FF0000; }
+    .tendencia-estable { color: #999; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2><i class="fas fa-user-graduate"></i> Seguimiento de Estudiante</h2>
+            <h4 class="text-muted">{{ estudiante.nombre }}</h4>
+            <p class="text-muted">
+                <strong>ID:</strong> {{ estudiante.id_estudiante }} |
+                <strong>Carrera:</strong> {{ estudiante.carrera.nombre }}
+            </p>
+        </div>
+        <div class="col-md-4 text-right">
+            <a href="{% url 'dashboard_predicciones' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Volver al Dashboard
+            </a>
+            <form method="post" action="{% url 'generar_prediccion' estudiante.id_estudiante %}" style="display: inline;">
+                {% csrf_token %}
+                <input type="hidden" name="semestre" value="3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-sync"></i> Generar Nueva Predicción
+                </button>
+            </form>
+        </div>
+    </div>
+
+    {% if tiene_predicciones %}
+    <!-- Resumen del Seguimiento -->
+    {% if seguimiento %}
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="metric-card bg-primary text-white">
+                <h4>{{ predicciones.count }}</h4>
+                <p>Semestres Analizados</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card bg-info text-white">
+                <h4>{{ seguimiento.ultimo_nivel_riesgo|upper }}</h4>
+                <p>Nivel de Riesgo Actual</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card {% if seguimiento.cambio_total_riesgo < 0 %}bg-success{% elif seguimiento.cambio_total_riesgo > 0 %}bg-danger{% else %}bg-secondary{% endif %} text-white">
+                <h4>{% widthratio seguimiento.cambio_total_riesgo 1 100 %}%</h4>
+                <p>Cambio Total de Riesgo</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card bg-warning">
+                <h4>{{ seguimiento.tendencia|upper }}</h4>
+                <p>Tendencia General</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Gráfico de Evolución -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5><i class="fas fa-chart-line"></i> Evolución del Riesgo de Deserción</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="graficoEvolucion" height="100"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timeline de Predicciones -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5><i class="fas fa-history"></i> Historial de Predicciones</h5>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        {% for pred in predicciones reversed %}
+                        <div class="timeline-item">
+                            <div class="timeline-marker riesgo-{{ pred.nivel_riesgo }}-bg">
+                                {{ pred.cohorte }}
+                            </div>
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <h5 class="mb-0">Semestre {{ pred.semestre_academico }}</h5>
+                                        <span class="badge badge-{% if pred.nivel_riesgo == 'critico' %}danger{% elif pred.nivel_riesgo == 'alto' %}warning{% elif pred.nivel_riesgo == 'medio' %}info{% else %}success{% endif %}">
+                                            {{ pred.get_nivel_riesgo_display }}
+                                        </span>
+                                    </div>
+                                    <div class="row mt-3">
+                                        <div class="col-md-3">
+                                            <strong>Predicción:</strong><br>
+                                            {{ pred.get_prediccion_display }}
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong>Prob. Deserción:</strong><br>
+                                            <span class="h5">{% widthratio pred.probabilidad_desercion 1 100 %}%</span>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong>Cohorte:</strong><br>
+                                            Cohorte {{ pred.cohorte }}
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong>Fecha:</strong><br>
+                                            {{ pred.fecha_prediccion|date:"d/m/Y" }}
+                                        </div>
+                                    </div>
+                                    <hr>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <small class="text-muted">Promedio Notas:</small><br>
+                                            <strong>{{ pred.promedio_notas|floatformat:2 }}</strong>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <small class="text-muted">Asistencia:</small><br>
+                                            <strong>{{ pred.asistencia_promedio|floatformat:1 }}%</strong>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <small class="text-muted">Uso Plataforma:</small><br>
+                                            <strong>{{ pred.uso_plataforma|floatformat:1 }}%</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alertas del Estudiante -->
+    {% if alertas %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-warning">
+                    <h5><i class="fas fa-bell"></i> Alertas Generadas</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        {% for alerta in alertas %}
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">
+                                    <span class="badge badge-{% if alerta.prioridad == 'critica' %}danger{% elif alerta.prioridad == 'alta' %}warning{% else %}info{% endif %}">
+                                        {{ alerta.get_prioridad_display }}
+                                    </span>
+                                    {{ alerta.titulo }}
+                                </h6>
+                                <small>{{ alerta.fecha_generacion|date:"d/m/Y H:i" }}</small>
+                            </div>
+                            <p class="mb-1">{{ alerta.descripcion }}</p>
+                            <small class="text-muted">
+                                <i class="fas fa-lightbulb"></i> {{ alerta.accion_sugerida }}
+                            </small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <!-- Sin Predicciones -->
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <h4><i class="fas fa-info-circle"></i> Sin Predicciones</h4>
+                <p>Este estudiante aún no tiene predicciones generadas. Genera una predicción para comenzar el seguimiento.</p>
+                <form method="post" action="{% url 'generar_prediccion' estudiante.id_estudiante %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="semestre" value="1">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-play"></i> Generar Primera Predicción
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+{% if tiene_predicciones %}
+// Preparar datos para el gráfico
+const semestres = {{ semestres_json|safe }};
+const probabilidades = [
+    {% for pred in predicciones %}
+        {{ pred.probabilidad_desercion|floatformat:4 }}{% if not forloop.last %},{% endif %}
+    {% endfor %}
+].map(p => p * 100);
+
+// Configurar gráfico
+const ctx = document.getElementById('graficoEvolucion').getContext('2d');
+const grafico = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: semestres,
+        datasets: [{
+            label: 'Probabilidad de Deserción (%)',
+            data: probabilidades,
+            borderColor: '#FF6384',
+            backgroundColor: 'rgba(255, 99, 132, 0.1)',
+            tension: 0.4,
+            fill: true,
+            pointRadius: 6,
+            pointHoverRadius: 8,
+            pointBackgroundColor: probabilidades.map(p => {
+                if (p >= 70) return '#FF0000';
+                if (p >= 50) return '#FF8800';
+                if (p >= 30) return '#FFCC00';
+                return '#4CAF50';
+            })
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: true,
+                position: 'top'
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return 'Riesgo: ' + context.parsed.y.toFixed(1) + '%';
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                max: 100,
+                ticks: {
+                    callback: function(value) {
+                        return value + '%';
+                    }
+                },
+                title: {
+                    display: true,
+                    text: 'Probabilidad de Deserción (%)'
+                }
+            },
+            x: {
+                title: {
+                    display: true,
+                    text: 'Semestre Académico'
+                }
+            }
+        }
+    }
+});
+{% endif %}
+</script>
+{% endblock %}

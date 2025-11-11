@@ -1,0 +1,20 @@
+RESUMEN DEL MODELO DE DESERCION ESTUDIANTIL
+==================================================
+
+Mejor modelo: XGBoost
+Accuracy: 0.8110
+CV Score: 0.8190
+
+Clases:
+  0: Dropout
+  1: Enrolled
+  2: Graduate
+
+Total de caracteristicas: 34
+
+Variables academicas clave encontradas:
+- Curricular units 2nd sem (approved)
+- Tuition fees up to date
+- Curricular units 2nd sem (grade)
+- Curricular units 1st sem (approved)
+- Curricular units 2nd sem (enrolled)

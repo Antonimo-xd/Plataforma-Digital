@@ -12847,3 +12847,244 @@ Traceback (most recent call last):
   File "C:\Users\anton\Documents\GitHub\Plataforma-Digital\AcademicPredict\prototipo\vistas\secondary_views.py", line 140, in alertas_usuario
     if alerta.tipo_alerta == 'nueva_anomalia':
 AttributeError: 'AlertaAutomatica' object has no attribute 'tipo_alerta'
+Internal Server Error: /cpa/anomalias/130/actualizar-estado/
+Traceback (most recent call last):
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\contrib\auth\decorators.py", line 59, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "C:\Users\anton\Documents\GitHub\Plataforma-Digital\AcademicPredict\prototipo\views.py", line 1619, in actualizar_estado_anomalia
+    return render(request, 'anomalias/detalle_anomalia.html')
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\shortcuts.py", line 25, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\loader.py", line 62, in render_to_string
+    return template.render(context, request)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\backends\django.py", line 107, in render
+    return self.template.render(context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 171, in render
+    return self._render(context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 163, in _render
+    return self.nodelist.render(context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 1016, in render
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 1016, in <listcomp>
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 977, in render_annotated
+    return self.render(context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\loader_tags.py", line 159, in render
+    return compiled_parent._render(context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 163, in _render
+    return self.nodelist.render(context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 1016, in render
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 1016, in <listcomp>
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 977, in render_annotated
+    return self.render(context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\loader_tags.py", line 65, in render
+    result = block.nodelist.render(context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 1016, in render
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 1016, in <listcomp>
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 977, in render_annotated
+    return self.render(context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\defaulttags.py", line 327, in render
+    return nodelist.render(context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 1016, in render
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 1016, in <listcomp>
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 977, in render_annotated
+    return self.render(context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\defaulttags.py", line 480, in render
+    url = reverse(view_name, args=args, kwargs=kwargs, current_app=current_app)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\urls\base.py", line 98, in reverse
+    resolved_url = resolver._reverse_with_prefix(view, prefix, *args, **kwargs)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\urls\resolvers.py", line 831, in _reverse_with_prefix
+    raise NoReverseMatch(msg)
+django.urls.exceptions.NoReverseMatch: Reverse for 'crear_derivacion' with arguments '('',)' not found. 1 pattern(s) tried: ['cpa/anomalias/(?P<anomalia_id>[0-9]+)/derivar/\\Z']
+Not Found: /cpa/api/probar-analisis/
+C:\Users\anton\Documents\GitHub\Plataforma-Digital\AcademicPredict\prototipo\views.py changed, reloading.
+Watching for file changes with StatReloader
+Not Found: /cpa/api/probar-analisis/
+Watching for file changes with StatReloader
+Internal Server Error: /cpa/derivaciones/1/detalle/
+Traceback (most recent call last):
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+TypeError: detalle_derivacion_ajax() got multiple values for argument 'derivacion_id'
+Not Found: /cpa/api/probar-analisis/
+C:\Users\anton\Documents\GitHub\Plataforma-Digital\AcademicPredict\prototipo\models.py changed, reloading.
+Watching for file changes with StatReloader
+C:\Users\anton\Documents\GitHub\Plataforma-Digital\AcademicPredict\prototipo\urls.py changed, reloading.
+Watching for file changes with StatReloader
+Cargando modelo de deserción estudiantil...
+Error al cargar modelo: No se encontró modelo en C:\Users\anton\Documents\GitHub\Plataforma-Digital\AcademicPredict\prototipo\ml_models\mejor_modelo.pkl
+Error al cargar modelo: No se encontró modelo en C:\Users\anton\Documents\GitHub\Plataforma-Digital\AcademicPredict\prototipo\ml_models\mejor_modelo.pkl
+Internal Server Error: /cpa/predicciones/
+Traceback (most recent call last):
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\db\backends\mysql\base.py", line 76, in execute
+    return self.cursor.execute(query, args)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\MySQLdb\cursors.py", line 179, in execute
+    res = self._query(mogrified_query)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\MySQLdb\cursors.py", line 330, in _query
+    db.query(q)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\MySQLdb\connections.py", line 280, in query
+    _mysql.connection.query(self, query)
+MySQLdb.ProgrammingError: (1146, "Table 'django.prototipo_predicciondesercion' doesn't exist")
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\contrib\auth\decorators.py", line 59, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "C:\Users\anton\Documents\GitHub\Plataforma-Digital\AcademicPredict\prototipo\vistas\prediccion_views.py", line 49, in dashboard_predicciones
+    ).count()
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\db\models\query.py", line 604, in count
+    return self.query.get_count(using=self.db)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\db\models\sql\query.py", line 644, in get_count
+    return obj.get_aggregation(using, {"__count": Count("*")})["__count"]
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\db\models\sql\query.py", line 626, in get_aggregation
+    result = compiler.execute_sql(SINGLE)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\db\models\sql\compiler.py", line 1623, in execute_sql
+    cursor.execute(sql, params)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\db\backends\utils.py", line 122, in execute
+    return super().execute(sql, params)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\db\utils.py", line 91, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\db\backends\mysql\base.py", line 76, in execute
+    return self.cursor.execute(query, args)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\MySQLdb\cursors.py", line 179, in execute
+    res = self._query(mogrified_query)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\MySQLdb\cursors.py", line 330, in _query
+    db.query(q)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\MySQLdb\connections.py", line 280, in query
+    _mysql.connection.query(self, query)
+django.db.utils.ProgrammingError: (1146, "Table 'django.prototipo_predicciondesercion' doesn't exist")
+Cargando modelo de deserción estudiantil...
+Error al cargar modelo: No se encontró modelo en C:\Users\anton\Documents\GitHub\Plataforma-Digital\AcademicPredict\prototipo\ml_models\mejor_modelo.pkl
+Error al cargar modelo: No se encontró modelo en C:\Users\anton\Documents\GitHub\Plataforma-Digital\AcademicPredict\prototipo\ml_models\mejor_modelo.pkl
+Cargando modelo de deserción estudiantil...
+Error al cargar modelo: No se encontró modelo en C:\Users\anton\Documents\GitHub\Plataforma-Digital\AcademicPredict\prototipo\ml_models\mejor_modelo.pkl
+Error al cargar modelo: No se encontró modelo en C:\Users\anton\Documents\GitHub\Plataforma-Digital\AcademicPredict\prototipo\ml_models\mejor_modelo.pkl
+Cargando modelo de deserción estudiantil...
+Modelo cargado exitosamente
+Tipo: XGBoost
+Accuracy: 0.8110
+Watching for file changes with StatReloader
+Cargando modelo de deserción estudiantil...
+Modelo cargado exitosamente
+Tipo: XGBoost
+Accuracy: 0.8110
+Cohortes inicializadas para semestre 3
+Internal Server Error: /cpa/predicciones/
+Traceback (most recent call last):
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\backends\django.py", line 107, in render
+    return self.template.render(context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 171, in render
+    return self._render(context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 163, in _render
+    return self.nodelist.render(context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 1016, in render
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 1016, in <listcomp>
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 977, in render_annotated
+    return self.render(context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\loader_tags.py", line 134, in render
+    compiled_parent = self.get_parent(context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\loader_tags.py", line 131, in get_parent
+    return self.find_template(parent, context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\loader_tags.py", line 109, in find_template
+    template, origin = context.template.engine.find_template(
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\engine.py", line 163, in find_template
+    raise TemplateDoesNotExist(name, tried=tried)
+django.template.exceptions.TemplateDoesNotExist: base.html
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\contrib\auth\decorators.py", line 59, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "C:\Users\anton\Documents\GitHub\Plataforma-Digital\AcademicPredict\prototipo\vistas\prediccion_views.py", line 105, in dashboard_predicciones
+    return render(request, 'predicciones/dashboard.html', context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\shortcuts.py", line 25, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\loader.py", line 62, in render_to_string
+    return template.render(context, request)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\backends\django.py", line 109, in render
+    reraise(exc, self.backend)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\backends\django.py", line 130, in reraise
+    raise new from exc
+django.template.exceptions.TemplateDoesNotExist: base.html
+Internal Server Error: /cpa/predicciones/
+Traceback (most recent call last):
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\backends\django.py", line 107, in render
+    return self.template.render(context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 171, in render
+    return self._render(context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 163, in _render
+    return self.nodelist.render(context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 1016, in render
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 1016, in <listcomp>
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\base.py", line 977, in render_annotated
+    return self.render(context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\loader_tags.py", line 134, in render
+    compiled_parent = self.get_parent(context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\loader_tags.py", line 131, in get_parent
+    return self.find_template(parent, context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\loader_tags.py", line 109, in find_template
+    template, origin = context.template.engine.find_template(
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\engine.py", line 163, in find_template
+    raise TemplateDoesNotExist(name, tried=tried)
+django.template.exceptions.TemplateDoesNotExist: anomalias/base.html.html
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\contrib\auth\decorators.py", line 59, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "C:\Users\anton\Documents\GitHub\Plataforma-Digital\AcademicPredict\prototipo\vistas\prediccion_views.py", line 105, in dashboard_predicciones
+    return render(request, 'predicciones/dashboard.html', context)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\shortcuts.py", line 25, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\loader.py", line 62, in render_to_string
+    return template.render(context, request)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\backends\django.py", line 109, in render
+    reraise(exc, self.backend)
+  File "C:\Users\anton\AppData\Local\Programs\Python\Python310\lib\site-packages\django\template\backends\django.py", line 130, in reraise
+    raise new from exc
+django.template.exceptions.TemplateDoesNotExist: anomalias/base.html.html
+Not Found: /.well-known/appspecific/com.chrome.devtools.json
+Not Found: /.well-known/appspecific/com.chrome.devtools.json
+Not Found: /.well-known/appspecific/com.chrome.devtools.json
+Not Found: /.well-known/appspecific/com.chrome.devtools.json

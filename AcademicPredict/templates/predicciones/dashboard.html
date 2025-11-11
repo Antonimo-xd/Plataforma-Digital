@@ -1,0 +1,307 @@
+{% extends 'anomalias/base.html' %}
+
+{% block title %}Dashboard de Predicciones - Sistema CPA{% endblock %}
+
+{% block extra_css %}
+<!-- Estilos específicos para el dashboard -->
+<style>
+.cohorte-card {
+    border-left: 5px solid;
+    transition: transform 0.2s;
+}
+.cohorte-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+.stat-card {
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+.riesgo-badge {
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+.riesgo-critico { background-color: #FF0000; color: white; }
+.riesgo-alto { background-color: #FF8800; color: white; }
+.riesgo-medio { background-color: #FFCC00; color: #333; }
+.riesgo-bajo { background-color: #4CAF50; color: white; }
+
+.progress-custom {
+    height: 25px;
+    border-radius: 15px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2><i class="fas fa-chart-line"></i> Dashboard de Predicciones de Deserción</h2>
+            <p class="text-muted">Análisis predictivo del riesgo de deserción estudiantil</p>
+        </div>
+    </div>
+
+    <!-- Selector de Semestre -->
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <div class="form-group">
+                <label for="semestreSelect">Semestre Académico:</label>
+                <select class="form-control" id="semestreSelect" onchange="cambiarSemestre(this.value)">
+                    {% for i in "123456" %}
+                        <option value="{{ forloop.counter }}" {% if forloop.counter == semestre_actual %}selected{% endif %}>
+                            Semestre {{ forloop.counter }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="col-md-6 text-right">
+            <form method="post" action="{% url 'generar_predicciones_masivas' %}" style="display: inline;">
+                {% csrf_token %}
+                <input type="hidden" name="semestre" value="{{ semestre_actual }}">
+                <button type="submit" class="btn btn-primary btn-lg" onclick="return confirm('¿Generar predicciones para todos los estudiantes activos?')">
+                    <i class="fas fa-sync"></i> Generar Predicciones Masivas
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Estadísticas Generales -->
+    <div class="row">
+        <div class="col-md-3">
+            <div class="stat-card bg-primary text-white">
+                <h3>{{ total_estudiantes }}</h3>
+                <p><i class="fas fa-users"></i> Total Estudiantes</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card bg-info text-white">
+                <h3>{{ total_predicciones }}</h3>
+                <p><i class="fas fa-chart-bar"></i> Predicciones Generadas</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card bg-danger text-white">
+                <h3>{{ stats_riesgo.critico }}</h3>
+                <p><i class="fas fa-exclamation-triangle"></i> Riesgo Crítico</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card bg-warning">
+                <h3>{{ stats_riesgo.alto }}</h3>
+                <p><i class="fas fa-exclamation-circle"></i> Riesgo Alto</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Distribución por Nivel de Riesgo -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-pie"></i> Distribución por Nivel de Riesgo</h5>
+                </div>
+                <div class="card-body">
+                    <div class="progress progress-custom">
+                        {% if total_predicciones > 0 %}
+                            <div class="progress-bar bg-danger" style="width: {% widthratio stats_riesgo.critico total_predicciones 100 %}%">
+                                Crítico: {{ stats_riesgo.critico }}
+                            </div>
+                            <div class="progress-bar bg-warning" style="width: {% widthratio stats_riesgo.alto total_predicciones 100 %}%">
+                                Alto: {{ stats_riesgo.alto }}
+                            </div>
+                            <div class="progress-bar bg-info" style="width: {% widthratio stats_riesgo.medio total_predicciones 100 %}%">
+                                Medio: {{ stats_riesgo.medio }}
+                            </div>
+                            <div class="progress-bar bg-success" style="width: {% widthratio stats_riesgo.bajo total_predicciones 100 %}%">
+                                Bajo: {{ stats_riesgo.bajo }}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cohortes -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h4><i class="fas fa-layer-group"></i> Cohortes de Riesgo</h4>
+        </div>
+        {% for cohorte in cohortes %}
+        <div class="col-md-4 mb-3">
+            <div class="card cohorte-card" style="border-left-color: {{ cohorte.color }};">
+                <div class="card-body">
+                    <h5 class="card-title">{{ cohorte.nombre }}</h5>
+                    <p class="card-text text-muted">{{ cohorte.descripcion }}</p>
+                    <div class="mb-2">
+                        <strong>{{ cohorte.total_estudiantes }}</strong> estudiantes
+                        <small class="text-muted">({{ cohorte.porcentaje_total|floatformat:1 }}%)</small>
+                    </div>
+                    <div class="mb-2">
+                        <strong>Umbral:</strong> {% widthratio cohorte.umbral_min 1 100 %}% - {% widthratio cohorte.umbral_max 1 100 %}%
+                    </div>
+                    <a href="{% url 'ver_cohorte' cohorte.numero_cohorte semestre_actual %}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-eye"></i> Ver Estudiantes
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Estudiantes en Riesgo Crítico -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5><i class="fas fa-exclamation-triangle"></i> Estudiantes en Riesgo Crítico (Top 10)</h5>
+                </div>
+                <div class="card-body">
+                    {% if estudiantes_criticos %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Nombre</th>
+                                    <th>Carrera</th>
+                                    <th>Probabilidad Deserción</th>
+                                    <th>Promedio</th>
+                                    <th>Asistencia</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pred in estudiantes_criticos %}
+                                <tr>
+                                    <td>{{ pred.estudiante.id_estudiante }}</td>
+                                    <td>{{ pred.estudiante.nombre }}</td>
+                                    <td>{{ pred.estudiante.carrera.nombre|truncatewords:3 }}</td>
+                                    <td>
+                                        <span class="riesgo-badge riesgo-critico">
+                                            {% widthratio pred.probabilidad_desercion 1 100 %}%
+                                        </span>
+                                    </td>
+                                    <td>{{ pred.promedio_notas|floatformat:2 }}</td>
+                                    <td>{{ pred.asistencia_promedio|floatformat:1 }}%</td>
+                                    <td>
+                                        <a href="{% url 'seguimiento_estudiante' pred.estudiante.id_estudiante %}"
+                                           class="btn btn-sm btn-info" title="Ver Seguimiento">
+                                            <i class="fas fa-chart-line"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-center text-muted">No hay estudiantes en riesgo crítico.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alertas Activas -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-warning">
+                    <h5><i class="fas fa-bell"></i> Alertas Activas Recientes</h5>
+                </div>
+                <div class="card-body">
+                    {% if alertas_activas %}
+                    <div class="list-group">
+                        {% for alerta in alertas_activas %}
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">
+                                    {% if alerta.prioridad == 'critica' %}
+                                        <span class="badge badge-danger">{{ alerta.get_prioridad_display }}</span>
+                                    {% elif alerta.prioridad == 'alta' %}
+                                        <span class="badge badge-warning">{{ alerta.get_prioridad_display }}</span>
+                                    {% else %}
+                                        <span class="badge badge-info">{{ alerta.get_prioridad_display }}</span>
+                                    {% endif %}
+                                    {{ alerta.titulo }}
+                                </h6>
+                                <small>{{ alerta.fecha_generacion|date:"d/m/Y H:i" }}</small>
+                            </div>
+                            <p class="mb-1">{{ alerta.descripcion }}</p>
+                            <small class="text-muted">
+                                <i class="fas fa-lightbulb"></i> {{ alerta.accion_sugerida }}
+                            </small>
+                            <div class="mt-2">
+                                <a href="{% url 'seguimiento_estudiante' alerta.prediccion.estudiante.id_estudiante %}"
+                                   class="btn btn-sm btn-outline-primary">
+                                    Ver Estudiante
+                                </a>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-center text-muted">No hay alertas activas.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Búsqueda Rápida -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5><i class="fas fa-search"></i> Búsqueda Avanzada</h5>
+                </div>
+                <div class="card-body">
+                    <form method="get" action="{% url 'buscar_estudiantes' %}">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <input type="text" name="busqueda" class="form-control" placeholder="Buscar por nombre o ID...">
+                            </div>
+                            <div class="col-md-3">
+                                <select name="cohorte" class="form-control">
+                                    <option value="">Todas las cohortes</option>
+                                    <option value="1">Cohorte 1 - Crítico</option>
+                                    <option value="2">Cohorte 2 - Alto</option>
+                                    <option value="3">Cohorte 3 - Medio-Bajo</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <select name="nivel_riesgo" class="form-control">
+                                    <option value="">Todos los niveles de riesgo</option>
+                                    <option value="critico">Crítico</option>
+                                    <option value="alto">Alto</option>
+                                    <option value="medio">Medio</option>
+                                    <option value="bajo">Bajo</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn btn-primary btn-block">
+                                    <i class="fas fa-search"></i> Buscar
+                                </button>
+                            </div>
+                        </div>
+                        <input type="hidden" name="semestre" value="{{ semestre_actual }}">
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function cambiarSemestre(semestre) {
+    window.location.href = '?semestre=' + semestre;
+}
+</script>
+{% endblock %}

@@ -12,6 +12,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <style>
         :root {
             --primary-color: #2c3e50;
@@ -223,6 +224,7 @@
                     <small class="text-muted">{{ user.get_rol_display }}</small>
                 </div>
             </div>
+
             <!-- Alertas no leídas -->
             {% if user.is_authenticated %}
             <div class="alert alert-info py-2 px-3 small">
@@ -240,6 +242,14 @@
                 </a>
             </li>
             
+            <!-- Nueva sección de Predicciones -->
+            <li class="nav-item">
+                <a class="nav-link {% if 'predicciones' in request.resolver_match.url_name %}active{% endif %}"
+                    href="{% url 'dashboard_predicciones' %}">
+                    <i class="fas fa-brain me-2"></i>Predicciones de Deserción
+                </a>
+            </li>
+
             {% if user.rol == 'analista_cpa' or user.rol == 'coordinador_cpa' or user.rol == 'admin' %}
             <li class="nav-item">
                 <a class="nav-link {% if 'anomalias' in request.resolver_match.url_name %}active{% endif %}" 

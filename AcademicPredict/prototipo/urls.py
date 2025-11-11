@@ -19,6 +19,20 @@ from .services.reports_service import ( exportar_reporte_derivaciones, exportar_
 
 from .utils.helpers import detalle_derivacion_ajax
 
+# 🔮 VISTAS DE PREDICCIÓN DE DESERCIÓN
+from .vistas.prediccion_views import (
+    dashboard_predicciones,
+    ver_cohorte,
+    seguimiento_estudiante,
+    buscar_estudiantes,
+    generar_prediccion,
+    generar_predicciones_masivas,
+    api_obtener_cohorte,
+    api_seguimiento_estudiante,
+    api_estadisticas_cohortes,
+    api_alertas_activas
+)
+
 # ================================================================
 # CONFIGURACIÓN DE URLs OPTIMIZADA
 # ================================================================
@@ -112,5 +126,25 @@ urlpatterns = [
     path('api/exportar-datos-avanzado/', api_exportar_datos_avanzado, name='api_exportar_datos_avanzado'),
 
     path('ayuda/', views.ayuda_documentacion, name='ayuda_documentacion'),
+
+    # ================================================================
+    # 🔮 SISTEMA DE PREDICCIÓN DE DESERCIÓN
+    # ================================================================
+
+    # Dashboard y visualizaciones principales
+    path('predicciones/', dashboard_predicciones, name='dashboard_predicciones'),
+    path('predicciones/cohorte/<int:numero_cohorte>/semestre/<int:semestre>/', ver_cohorte, name='ver_cohorte'),
+    path('predicciones/estudiante/<int:estudiante_id>/seguimiento/', seguimiento_estudiante, name='seguimiento_estudiante'),
+    path('predicciones/buscar/', buscar_estudiantes, name='buscar_estudiantes'),
+
+    # Acciones de predicción
+    path('predicciones/generar/<int:estudiante_id>/', generar_prediccion, name='generar_prediccion'),
+    path('predicciones/generar-masivas/', generar_predicciones_masivas, name='generar_predicciones_masivas'),
+
+    # APIs de predicción
+    path('api/predicciones/cohorte/<int:numero_cohorte>/semestre/<int:semestre>/', api_obtener_cohorte, name='api_obtener_cohorte'),
+    path('api/predicciones/estudiante/<int:estudiante_id>/seguimiento/', api_seguimiento_estudiante, name='api_seguimiento_estudiante'),
+    path('api/predicciones/estadisticas-cohortes/', api_estadisticas_cohortes, name='api_estadisticas_cohortes'),
+    path('api/predicciones/alertas-activas/', api_alertas_activas, name='api_alertas_activas'),
     
 ]
